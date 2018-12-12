@@ -1,6 +1,7 @@
 # Output Params
-This project has a series of unit tests to make sure that sending and returning values to/from Python code works.
+This project has a series of unit tests to make sure that sending values to and returning values from Python code works.
 
+## Overview
 A few wrinkles we have to deal with:
 - Blueprint functions have no return values, but they can have zero or more output parameters
 - C++ can optionally have a return value, and can also have zero or more output parameters
@@ -23,7 +24,8 @@ To ensure completeness, there are BP, C++, and Python implementations of TestAct
 - BP calling BP
 - BP calling Py
 
-(obviously a number of these - like C++ calling BP - should just work, but they are included to ensure consistency across languages)
+Obviously a number of these - like C++ calling BP - should just work, but they are included to ensure consistency across languages. They are also useful
+as references when troubleshooting problems with the Python versions.
 
 For each of the above scenarios, the project tests both the 'caller' and 'callee' side in the following scenarios:
 
@@ -47,4 +49,13 @@ For each of the above scenarios, the project tests both the 'caller' and 'callee
 | 0 | 2 | Y |
 | 0 | 2 | Y |
 | 0 | 2 | Y |
+
+## Setup
+To use this project:
+1. Clone or download it.
+1. Go into the output_params/Plugins directory and install UnrealEnginePython there (e.g. by cloning the repo).
+1. In Windows Explorer, right click on output_params.uproject and choose the option to generate Visual Studio project files
+1. Open output_params.sln, set output_params as the startup project, and then run it.
+
+The tests run when you start PIE. After they have run initially, you can press the space bar to run them again.
 
