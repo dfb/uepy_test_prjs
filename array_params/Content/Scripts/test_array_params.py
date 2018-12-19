@@ -2,11 +2,16 @@
 testing array parameters
 
 for each combination of one language calling another:
-    for each: int, bool, fvector string, object, scriptstruct:
+    for each: int, bool, fvector, string, object, scriptstruct:
          test array in
          test array out
          test array ret
          test array in, out, ret
+
+NEXT:
+- impl bool tests
+- impl rest of tests
+- review code, submit patch
 '''
 
 from helpers import *
@@ -22,6 +27,7 @@ def sarg(arg):
     if type(arg) is str: return arg
     if type(arg) is list: return '[%s]' % (','.join(sarg(x) for x in arg))
     if type(arg) is tuple: return sargs(arg)
+    if type(arg) is bool: return str(int(arg))
     assert 0, repr(arg)
 
 def sargs(*args):
@@ -67,6 +73,8 @@ class PTester(CTester):
         PCall('tester', callee, 'IntRet', 45)
         PCall('tester', callee, 'IntInOutRet', 51, [99,89,79,69,59,49,39,29,19,9,-1])
 
+        PCall('tester', callee, 'BoolIn', 44, [True, False, False, True, True], 202.511)
+
 class PTestActor(CTestActor):
     def IntIn(self, i:int, ints:[int], f:float):
         tr.Note('IntIn', 'recv', sargs(i, ints, f))
@@ -89,6 +97,9 @@ class PTestActor(CTestActor):
         tr.Note('IntInOutRet', 'send', sretargs(ret))
         return ret
 
+    def BoolIn(self, i:int, bools:[bool], f:float):
+        tr.Note('BoolIn', 'recv', sargs(i, bools, f))
+
 EXPECTED = '''
 tester|send|10,[55,57,59,61],3.500
 IntIn|recv|10,[55,57,59,61],3.500
@@ -108,6 +119,11 @@ tester|send|51,[99,89,79,69,59,49,39,29,19,9,-1]
 IntInOutRet|recv|51,[99,89,79,69,59,49,39,29,19,9,-1]
 IntInOutRet|send|[-11,37,1011,65535],113.117,[16,32,64,128,256,512]
 tester|recv|[-11,37,1011,65535],113.117,[16,32,64,128,256,512]
+
+
+tester|send|44,[1,0,0,1,1],202.511
+BoolIn|recv|44,[1,0,0,1,1],202.511
+tester|recv|None
 
 '''
 

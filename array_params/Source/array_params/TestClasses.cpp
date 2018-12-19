@@ -21,6 +21,14 @@ FString StrIntArray(const TArray<int32>& array)
     return FString::Printf(_T("[%s]"), *FString::Join(parts, _T(",")));
 }
 
+FString StrBoolArray(const TArray<bool>& array)
+{
+    TArray<FString> parts;
+    for (bool a : array)
+        parts.Emplace(FString::Printf(_T("%d"), a));
+    return FString::Printf(_T("[%s]"), *FString::Join(parts, _T(",")));
+}
+
 void NoteIntArray(ATestRecorder *tr, FString who, FString action, const TArray<int32>& array)
 {
     tr->Note(*who, *action, *StrIntArray(array));
@@ -71,6 +79,109 @@ TArray<int32> ATestActor::IntInOutRet_Implementation(int i, const TArray<int32>&
     return retInts;
 }
 
+void ATestActor::BoolIn_Implementation(int i, const TArray<bool>& bools, float f)
+{
+    FString args = FString::Printf(_T("%d,%s,%.3f"), i, *StrBoolArray(bools), f);
+    recorder->Note(_T("BoolIn"), _T("recv"), *args);
+}
+
+void ATestActor::BoolOut_Implementation(int i, TArray<bool>& bools, float& of)
+{
+}
+
+TArray<bool> ATestActor::BoolRet_Implementation(int i)
+{
+    TArray<bool> ret;
+    return ret;
+}
+
+TArray<bool> ATestActor::BoolInOutRet_Implementation(int i, const TArray<bool>& inBools, TArray<bool>& outBools, float& of)
+{
+    TArray<bool> ret;
+    return ret;
+}
+
+void ATestActor::VectorIn_Implementation(int i, const TArray<FVector>& vectors, float f)
+{
+}
+
+void ATestActor::VectorOut_Implementation(int i, TArray<FVector>& vectors, float& of)
+{
+}
+
+TArray<FVector> ATestActor::VectorRet_Implementation(int i)
+{
+    TArray<FVector> ret;
+    return ret;
+}
+
+TArray<FVector> ATestActor::VectorInOutRet_Implementation(int i, const TArray<FVector>& inVectors, TArray<FVector>& outVectors, float& of)
+{
+    TArray<FVector> ret;
+    return ret;
+}
+
+void ATestActor::StringIn_Implementation(int i, const TArray<FString>& strings, float f)
+{
+}
+
+void ATestActor::StringOut_Implementation(int i, TArray<FString>& strings, float& of)
+{
+}
+
+TArray<FString> ATestActor::StringRet_Implementation(int i)
+{
+    TArray<FString> ret;
+    return ret;
+}
+
+TArray<FString> ATestActor::StringInOutRet_Implementation(int i, const TArray<FString>& inStrings, TArray<FString>& outStrings, float& of)
+{
+    TArray<FString> ret;
+    return ret;
+}
+
+void ATestActor::ActorIn_Implementation(int i, const TArray<AActor*>& actors, float f)
+{
+}
+
+void ATestActor::ActorOut_Implementation(int i, TArray<AActor*>& actors, float& of)
+{
+}
+
+TArray<AActor*> ATestActor::ActorRet_Implementation(int i)
+{
+    TArray<AActor *> ret;
+    return ret;
+}
+
+TArray<AActor*> ATestActor::ActorInOutRet_Implementation(int i, const TArray<AActor*>& inActors, TArray<AActor*>& outActors, float& of)
+{
+    TArray<AActor *> ret;
+    return ret;
+}
+
+void ATestActor::StructIn_Implementation(int i, const TArray<FTestStruct>& structs, float f)
+{
+}
+
+void ATestActor::StructOut_Implementation(int i, TArray<FTestStruct>& structs, float& of)
+{
+}
+
+TArray<FTestStruct> ATestActor::StructRet_Implementation(int i)
+{
+    TArray<FTestStruct> ret;
+    return ret;
+}
+
+TArray<FTestStruct> ATestActor::StructInOutRet_Implementation(int i, const TArray<FTestStruct>& inStructs, TArray<FTestStruct>& outStructs, float& of)
+{
+    TArray<FTestStruct> ret;
+    return ret;
+}
+
+
 void ATester::RunDebugTest(ATestRecorder *recorder, ATestActor *callee)
 {
 
@@ -78,6 +189,7 @@ void ATester::RunDebugTest(ATestRecorder *recorder, ATestActor *callee)
 
 void ATester::RunTests(ATestRecorder *recorder, ATestActor *callee)
 {
+    // bool
     {
         TArray<int32> ints = {55, 57, 59, 61};
         int i = 10;
@@ -111,6 +223,17 @@ void ATester::RunTests(ATestRecorder *recorder, ATestActor *callee)
         retInts = callee->IntInOutRet(i, inInts, outInts, of);
         args = FString::Printf(_T("%s,%.3f,%s"), *StrIntArray(outInts), of, *StrIntArray(retInts));
         recorder->Note(_T("tester"), _T("recv"), args);
+    }
+
+    // bool
+    {
+        int i = 44;
+        TArray<bool> bools = {true, false, false, true, true};
+        float f = 202.511;
+        FString args = FString::Printf(_T("%d,%s,%.3f"), i, *StrBoolArray(bools), f);
+        recorder->Note(_T("tester"), _T("send"), *args);
+        callee->BoolIn(i, bools, f);
+        recorder->Note(_T("tester"), _T("recv"), _T("None"));
     }
 
 }
