@@ -1,5 +1,6 @@
 from helpers import *
-from unreal_engine.classes import Blueprint, K2Node_MakeArray as K2Node_MakeArray, K2Node_Event, KismetSystemLibrary as KSL, KismetTextLibrary as KTL, KismetStringLibrary as KStrLib
+from unreal_engine.classes import (Blueprint, K2Node_FunctionResult, K2Node_MakeArray as K2Node_MakeArray, K2Node_Event,
+    KismetSystemLibrary as KSL, KismetTextLibrary as KTL, KismetStringLibrary as KStrLib)
 from unreal_engine import EdGraphPin
 
 def FindBP(path, open=False):
@@ -114,50 +115,160 @@ def MakeArgsStr(graph, *args):
     join.Separator = ','
     return join
 
+def TestRecorderNote(graph, who, action, argsPin, executePin):
+    '''adds a call to TestRecorder.Note, wires it up, and returns the wrapped node'''
+    node = MakeCall(graph, TestRecorder.Note)
+    node.self = GetVariable(graph, 'Recorder').Recorder
+    node.who = who
+    node.action = action
+    node.args = argsPin
+    node.execute = executePin
+    return node
+
+def GetFunctionGraph(bp, name):
+    for graph in bp.FunctionGraphs:
+        if graph.get_name() == name:
+            return graph
+    assert 0, 'Function %s not found' % name
+
+def GetReturnNode(graph):
+    for node in graph.Nodes:
+        if node.is_a(K2Node_FunctionResult):
+            return NodeWrapper(node)
+    assert 0, 'No return node found'
+
 Utils = FindBP('/Game/Utils.Utils').GeneratedClass
 from unreal_engine.classes import TestRecorder, TestActor
 
-# Add a test node
-bp = FindBP('/Game/BTester.BTester')
-graph = ue.blueprint_add_function(bp, 'TestBoolIn')
-entry = graph.Nodes[0]
+if 0:
+    # BoolInOutRet
+    bp = FindBP('/Game/BTestActor.BTestActor')
+    graph = GetFunctionGraph(bp, 'BoolInOutRet')
+    entry = NodeWrapper(graph.Nodes[0])
+    argsStr = MakeArgsStr(graph, (entry.i, Utils.StrInt), (entry.inBools, Utils.StrBoolArray))
+    recvNote = TestRecorderNote(graph, 'BoolInOutRet', 'recv', argsStr.ReturnValue, entry.then)
+    outArray = MakeArray(graph, [True, False, False, True, True, True, True, True, False])
+    outF = MakeLiteral(graph, 1125.865)
+    retArray = MakeArray(graph, [True, True, False, False, False, True, False, False, True, True])
+    argsStr = MakeArgsStr(graph, (outArray.Array, Utils.StrBoolArray), (outF.ReturnValue, Utils.StrFloat), (retArray.Array, Utils.StrBoolArray))
+    sendNote = TestRecorderNote(graph, 'BoolInOutRet', 'send', argsStr.ReturnValue, recvNote.then)
+    ret = GetReturnNode(graph)
+    ret.execute = sendNote.then
+    ret.outBools = outArray.Array
+    ret.of = outF.ReturnValue
+    ret.ReturnValue = retArray.Array
 
-# build args
-i = MakeLiteral(graph, 44)
-a = MakeArray(graph, [True, False, False, True, True])
-f = MakeLiteral(graph, 202.511)
+if 0:
+    # TestBoolInOutRet
+    bp = FindBP('/Game/BTester.BTester')
+    graph = ue.blueprint_add_function(bp, 'TestBoolInOutRet')
+    entry = graph.Nodes[0]
+    i = MakeLiteral(graph, 32711)
+    a = MakeArray(graph, [False, False, True, False, False, True, False, True, True, True])
+    argsStr = MakeArgsStr(graph, (i.ReturnValue, Utils.StrInt), (a.Array, Utils.StrBoolArray))
+    preNote = TestRecorderNote(graph, 'tester', 'send', argsStr.ReturnValue, entry.node_find_pin('then'))
+    ta = GetVariable(graph, 'TestActor')
+    taCall = MakeCall(graph, TestActor.BoolInOutRet)
+    taCall.self = ta.TestActor
+    taCall.i = i.ReturnValue
+    taCall.inBools = a.Array
+    taCall.execute = preNote.then
+    argsStr = MakeArgsStr(graph, (taCall.outBools, Utils.StrBoolArray), (taCall.of, Utils.StrFloat), (taCall.ReturnValue, Utils.StrBoolArray))
+    TestRecorderNote(graph, 'tester', 'recv', argsStr.ReturnValue, taCall.then)
 
-# make args string
-argsStr = MakeArgsStr(graph, (i.ReturnValue, Utils.StrInt), (a.Array, Utils.StrBoolArray), (f.ReturnValue, Utils.StrFloat))
+if 0:
+    # BoolRet
+    bp = FindBP('/Game/BTestActor.BTestActor')
+    for graph in bp.FunctionGraphs:
+        if graph.get_name() == 'BoolRet':
+            break
+    else:
+        graph = None
+    entry = NodeWrapper(graph.Nodes[0])
+    argsStr = MakeArgsStr(graph, (entry.i, Utils.StrInt))
+    recvNote = TestRecorderNote(graph, 'BoolRet', 'recv', argsStr.ReturnValue, entry.then)
+    array = MakeArray(graph, [True, False, True, False, False, True, True])
+    argsStr = MakeArgsStr(graph, (array.Array, Utils.StrBoolArray))
+    sendNote = TestRecorderNote(graph, 'BoolRet', 'send', argsStr.ReturnValue, recvNote.then)
+    ret = GetReturnNode(graph)
+    ret.execute = sendNote.then
+    ret.ReturnValue = array.Array
 
-# note in test recorder
-tr = GetVariable(graph, 'TestRecorder')
-preNote = MakeCall(graph, TestRecorder.Note)
-preNote.self = tr.TestRecorder
-preNote.who = 'tester'
-preNote.action = 'send'
-preNote.args = argsStr.ReturnValue
-preNote.execute = entry.node_find_pin('then')
+if 0:
+    # TestBoolRet
+    bp = FindBP('/Game/BTester.BTester')
+    graph = ue.blueprint_add_function(bp, 'TestBoolRet')
+    entry = graph.Nodes[0]
+    i = MakeLiteral(graph, 6991)
+    argsStr = MakeArgsStr(graph, (i.ReturnValue, Utils.StrInt))
+    preNote = TestRecorderNote(graph, 'tester', 'send', argsStr.ReturnValue, entry.node_find_pin('then'))
+    ta = GetVariable(graph, 'TestActor')
+    taCall = MakeCall(graph, TestActor.BoolRet)
+    taCall.self = ta.TestActor
+    taCall.i = i.ReturnValue
+    taCall.execute = preNote.then
+    argsStr = MakeArgsStr(graph, (taCall.ReturnValue, Utils.StrBoolArray))
+    TestRecorderNote(graph, 'tester', 'recv', argsStr.ReturnValue, taCall.then)
 
-# call func
-ta = GetVariable(graph, 'TestActor')
-taCall = MakeCall(graph, TestActor.BoolIn)
-taCall.self = ta.TestActor
-taCall.i = i.ReturnValue
-taCall.bools = a.Array
-taCall.f = f.ReturnValue
-taCall.execute = preNote.then
+if 0:
+    # TestBoolOut
+    # Add a test node
+    bp = FindBP('/Game/BTester.BTester')
+    graph = ue.blueprint_add_function(bp, 'TestBoolOut')
+    entry = graph.Nodes[0]
 
-# combine result
-# (not needed here)
+    # build args
+    i = MakeLiteral(graph, 81)
 
-# pass to test recorder
-node = MakeCall(graph, TestRecorder.Note)
-node.self = tr.TestRecorder
-node.who = 'tester'
-node.action = 'recv'
-node.args = 'None'
-node.execute = taCall.then
+    # make args string
+    argsStr = MakeArgsStr(graph, (i.ReturnValue, Utils.StrInt))
+
+    # note in test recorder
+    preNote = TestRecorderNote(graph, 'tester', 'send', argsStr.ReturnValue, entry.node_find_pin('then'))
+
+    # call func
+    ta = GetVariable(graph, 'TestActor')
+    taCall = MakeCall(graph, TestActor.BoolOut)
+    taCall.self = ta.TestActor
+    taCall.i = i.ReturnValue
+    taCall.execute = preNote.then
+
+    # combine result
+    argsStr = MakeArgsStr(graph, (taCall.bools, Utils.StrBoolArray), (taCall.of, Utils.StrFloat))
+
+    TestRecorderNote(graph, 'tester', 'recv', argsStr.ReturnValue, taCall.then)
+
+if 0:
+    # TestBoolIn
+    # Add a test node
+    bp = FindBP('/Game/BTester.BTester')
+    graph = ue.blueprint_add_function(bp, 'TestBoolIn')
+    entry = graph.Nodes[0]
+
+    # build args
+    i = MakeLiteral(graph, 44)
+    a = MakeArray(graph, [True, False, False, True, True])
+    f = MakeLiteral(graph, 202.511)
+
+    # make args string
+    argsStr = MakeArgsStr(graph, (i.ReturnValue, Utils.StrInt), (a.Array, Utils.StrBoolArray), (f.ReturnValue, Utils.StrFloat))
+
+    # note in test recorder
+    preNote = TestRecorderNote(graph, 'tester', 'send', argsStr.ReturnValue, entry.node_find_pin('then'))
+
+    # call func
+    ta = GetVariable(graph, 'TestActor')
+    taCall = MakeCall(graph, TestActor.BoolIn)
+    taCall.self = ta.TestActor
+    taCall.i = i.ReturnValue
+    taCall.bools = a.Array
+    taCall.f = f.ReturnValue
+    taCall.execute = preNote.then
+
+    # combine result
+    # (not needed here)
+
+    TestRecorderNote(graph, 'tester', 'recv', 'None', taCall.then)
 
 if 0:
     Utils = FindBP('/Game/Utils.Utils').GeneratedClass

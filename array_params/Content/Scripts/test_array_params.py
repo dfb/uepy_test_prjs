@@ -74,6 +74,9 @@ class PTester(CTester):
         PCall('tester', callee, 'IntInOutRet', 51, [99,89,79,69,59,49,39,29,19,9,-1])
 
         PCall('tester', callee, 'BoolIn', 44, [True, False, False, True, True], 202.511)
+        PCall('tester', callee, 'BoolOut', 81)
+        PCall('tester', callee, 'BoolRet', 6991)
+        PCall('tester', callee, 'BoolInOutRet', 32711, [False, False, True, False, False, True, False, True, True, True])
 
 class PTestActor(CTestActor):
     def IntIn(self, i:int, ints:[int], f:float):
@@ -100,6 +103,25 @@ class PTestActor(CTestActor):
     def BoolIn(self, i:int, bools:[bool], f:float):
         tr.Note('BoolIn', 'recv', sargs(i, bools, f))
 
+    def BoolOut(self, i:int) -> ([bool], float):
+        tr.Note('BoolOut', 'recv', sargs(i))
+        ret = [False, True, False, False, True], 55.125
+        tr.Note('BoolOut', 'send', sretargs(ret))
+        return ret
+
+    def BoolRet(self, i:int) -> [bool]:
+        tr.Note('BoolRet', 'recv', sargs(i))
+        ret = [True, False, True, False, False, True, True];
+        tr.Note('BoolRet', 'send', sretargs(ret))
+        return ret
+
+    def BoolInOutRet(self, i:int, inBools:[bool]) -> ([bool], float, [bool]):
+        tr.Note('BoolInOutRet', 'recv', sargs(i, inBools))
+        ret = [True, False, False, True, True, True, True, True, False], 1125.865, [True, True, False, False, False, True, False, False, True, True]
+        tr.Note('BoolInOutRet', 'send', sretargs(ret))
+        return ret
+
+
 EXPECTED = '''
 tester|send|10,[55,57,59,61],3.500
 IntIn|recv|10,[55,57,59,61],3.500
@@ -125,6 +147,21 @@ tester|send|44,[1,0,0,1,1],202.511
 BoolIn|recv|44,[1,0,0,1,1],202.511
 tester|recv|None
 
+tester|send|81
+BoolOut|recv|81
+BoolOut|send|[0,1,0,0,1],55.125
+tester|recv|[0,1,0,0,1],55.125
+
+tester|send|6991
+BoolRet|recv|6991
+BoolRet|send|[1,0,1,0,0,1,1]
+tester|recv|[1,0,1,0,0,1,1]
+
+tester|send|32711,[0,0,1,0,0,1,0,1,1,1]
+BoolInOutRet|recv|32711,[0,0,1,0,0,1,0,1,1,1]
+BoolInOutRet|send|[1,0,0,1,1,1,1,1,0],1125.865,[1,1,0,0,0,1,0,0,1,1]
+tester|recv|[1,0,0,1,1,1,1,1,0],1125.865,[1,1,0,0,0,1,0,0,1,1]
+
 '''
 
 def Debug(title, testerClass, actorClass):
@@ -132,9 +169,10 @@ def Debug(title, testerClass, actorClass):
     actor = Spawn(actorClass, nuke=True)
     try:
         log('===== DEBUG START %s =====' % title)
+        tr.Clear()
         actor.SetRecorder(tr)
         tester.RunDebugTest(tr, actor)
-        tr.Clear()
+        log(tr.GetLines())
     finally:
         actor.DestroyActor()
         tester.DestroyActor()
@@ -153,15 +191,18 @@ def Run(title, testerClass, actorClass):
         actor.DestroyActor()
         tester.DestroyActor()
 
-Run('C++ calling C++', CTester, CTestActor)
-Run('C++ calling BP', CTester, BTestActor)
-Run('C++ calling Py', CTester, PTestActor)
-Run('Py calling C++', PTester, CTestActor)
-Run('Py calling BP', PTester, BTestActor)
-Run('Py calling Py', PTester, PTestActor)
-Run('BP calling C++', BTester, CTestActor)
-Run('BP calling BP', BTester, BTestActor)
-Run('BP calling Py', BTester, PTestActor)
+#Debug('BP calling Py', BTester, PTestActor)
+
+if 1:
+    Run('C++ calling C++', CTester, CTestActor)
+    Run('C++ calling BP', CTester, BTestActor)
+    Run('C++ calling Py', CTester, PTestActor)
+    Run('Py calling C++', PTester, CTestActor)
+    Run('Py calling BP', PTester, BTestActor)
+    Run('Py calling Py', PTester, PTestActor)
+    Run('BP calling C++', BTester, CTestActor)
+    Run('BP calling BP', BTester, BTestActor)
+    Run('BP calling Py', BTester, PTestActor)
 
 tr.DestroyActor()
 ue.allow_actor_script_execution_in_editor(False)

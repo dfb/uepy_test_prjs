@@ -87,17 +87,46 @@ void ATestActor::BoolIn_Implementation(int i, const TArray<bool>& bools, float f
 
 void ATestActor::BoolOut_Implementation(int i, TArray<bool>& bools, float& of)
 {
+    bools.Empty();
+    bools.Emplace(false);
+    bools.Emplace(true);
+    bools.Emplace(false);
+    bools.Emplace(false);
+    bools.Emplace(true);
+    of = 55.125;
+    FString args = FString::Printf(_T("%d"), i);
+    recorder->Note(_T("BoolOut"), _T("recv"), *args);
+    args = FString::Printf(_T("%s,%.3f"), *StrBoolArray(bools), of);
+    recorder->Note(_T("BoolOut"), _T("send"), *args);
 }
 
 TArray<bool> ATestActor::BoolRet_Implementation(int i)
 {
-    TArray<bool> ret;
+    FString args = FString::Printf(_T("%d"), i);
+    recorder->Note(_T("BoolRet"), _T("recv"), *args);
+    TArray<bool> ret = {true, false, true, false, false, true, true};
+    recorder->Note(_T("BoolRet"), _T("send"), *StrBoolArray(ret));
     return ret;
 }
 
 TArray<bool> ATestActor::BoolInOutRet_Implementation(int i, const TArray<bool>& inBools, TArray<bool>& outBools, float& of)
 {
-    TArray<bool> ret;
+    FString args = FString::Printf(_T("%d,%s"), i, *StrBoolArray(inBools));
+    recorder->Note(_T("BoolInOutRet"), _T("recv"), *args);
+    of = 1125.865;
+    outBools.Empty();
+    outBools.Emplace(true);
+    outBools.Emplace(false);
+    outBools.Emplace(false);
+    outBools.Emplace(true);
+    outBools.Emplace(true);
+    outBools.Emplace(true);
+    outBools.Emplace(true);
+    outBools.Emplace(true);
+    outBools.Emplace(false);
+    TArray<bool> ret = {true, true, false, false, false, true, false, false, true, true};
+    args = FString::Printf(_T("%s,%.3f,%s"), *StrBoolArray(outBools), of, *StrBoolArray(ret));
+    recorder->Note(_T("BoolInOutRet"), _T("send"), *args);
     return ret;
 }
 
@@ -235,6 +264,32 @@ void ATester::RunTests(ATestRecorder *recorder, ATestActor *callee)
         callee->BoolIn(i, bools, f);
         recorder->Note(_T("tester"), _T("recv"), _T("None"));
     }
-
+    {
+        TArray<bool> bools;
+        float f;
+        recorder->Note(_T("tester"), _T("send"), _T("81"));
+        callee->BoolOut(81, bools, f);
+        FString args = FString::Printf(_T("%s,%.3f"), *StrBoolArray(bools), f);
+        recorder->Note(_T("tester"), _T("recv"), args);
+    }
+    {
+        int i = 6991;
+        FString args = FString::Printf(_T("%d"), i);
+        recorder->Note(_T("tester"), _T("send"), args);
+        TArray<bool> bools = callee->BoolRet(i);
+        args = FString::Printf(_T("%s"), *StrBoolArray(bools));
+        recorder->Note(_T("tester"), _T("recv"), args);
+    }
+    {
+        int i = 32711;
+        TArray<bool> inParam = {false, false, true, false, false, true, false, true, true, true};
+        FString args = FString::Printf(_T("%d,%s"), i, *StrBoolArray(inParam));
+        recorder->Note(_T("tester"), _T("send"), args);
+        float of = 0.0f;
+        TArray<bool> retParam, outParam;
+        retParam = callee->BoolInOutRet(i, inParam, outParam, of);
+        args = FString::Printf(_T("%s,%.3f,%s"), *StrBoolArray(outParam), of, *StrBoolArray(retParam));
+        recorder->Note(_T("tester"), _T("recv"), args);
+    }
 }
 
