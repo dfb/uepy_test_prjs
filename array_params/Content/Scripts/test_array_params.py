@@ -24,7 +24,7 @@ def sarg(arg):
     if arg is None: return 'None'
     if type(arg) is int: return str(arg)
     if type(arg) is float: return '%.3f' % arg
-    if type(arg) is str: return arg
+    if type(arg) is str: return '"%s"' % arg
     if type(arg) is list: return '[%s]' % (','.join(sarg(x) for x in arg))
     if type(arg) is tuple: return sargs(arg)
     if type(arg) is bool: return str(int(arg))
@@ -83,6 +83,11 @@ class PTester(CTester):
         PCall('tester', callee, 'VectorOut', 7777)
         PCall('tester', callee, 'VectorRet', 5110)
         PCall('tester', callee, 'VectorInOutret', 99411, [FVector(10,11,12),FVector(13,14,15),FVector(16,17,18),FVector(19,20,-21)])
+
+        PCall('tester', callee, 'StringIn', 786, ['Rachael', 'Jacob', 'Nathan', 'Adam'], 3.142)
+        PCall('tester', callee, 'StringOut', 12321)
+        PCall('tester', callee, 'StringRet', 17761)
+        PCall('tester', callee, 'StringInOutRet', 73716, ['One','Two','Three','Four','Five','Six'])
 
 class PTestActor(CTestActor):
     def IntIn(self, i:int, ints:[int], f:float):
@@ -145,11 +150,33 @@ class PTestActor(CTestActor):
 
     def VectorInOutRet(self, i:int, inVectors:[FVector]) -> ([FVector], float, [FVector]):
         tr.Note('VectorInOutRet', 'recv', sargs(i, inVectors))
-        ret = [True, False, False, True, True, True, True, True, False], 1125.865, [True, True, False, False, False, True, False, False, True, True]
         ret = [FVector(1.111,2.222,3.333), FVector(4.444,5.555,6.666)], 1151.966, \
                 [FVector(100.000,200.000,300.000), FVector(400.000,500.000,600.000), FVector(10.000,20.000,30.000), FVector(40.000,50.000,60.000)]
         tr.Note('VectorInOutRet', 'send', sretargs(ret))
         return ret
+
+    def StringIn(self, i:int, strings:[str], f:float):
+        tr.Note('StringIn', 'recv', sargs(i, strings, f))
+        tr.Note('StringIn', 'send', 'None')
+
+    def StringOut(self, i:int) -> ([str], float):
+        tr.Note('StringOut', 'recv', sargs(i))
+        ret = ['Jan', 'February', 'MaRzO'], -113.311
+        tr.Note('StringOut', 'send', sretargs(ret))
+        return ret
+
+    def StringRet(self, i:int) -> [str]:
+        tr.Note('StringRet', 'recv', sargs(i))
+        ret = ["Enero","Febrero","Marzo","Abril"]
+        tr.Note('StringRet', 'send', sretargs(ret))
+        return ret
+
+    def StringInOutRet(self, i:int, inStrings:[str]) -> ([str], float, [str]):
+        tr.Note('StringInOutRet', 'recv', sargs(i, inStrings))
+        ret = ['Origin','Rebates','Foreseen','Abner'], 77.115, ['Battery', 'Mouse', 'Pad', 'Charger', 'Cord']
+        tr.Note('StringInOutRet', 'send', sretargs(ret))
+        return ret
+
 
 EXPECTED = '''
 tester|send|10,[55,57,59,61],3.500
@@ -211,6 +238,26 @@ tester|send|99411,[Vec(10.000,11.000,12.000),Vec(13.000,14.000,15.000),Vec(16.00
 VectorInOutRet|recv|99411,[Vec(10.000,11.000,12.000),Vec(13.000,14.000,15.000),Vec(16.000,17.000,18.000),Vec(19.000,20.000,-21.000)]
 VectorInOutRet|send|[Vec(1.111,2.222,3.333),Vec(4.444,5.555,6.666)],1151.966,[Vec(100.000,200.000,300.000),Vec(400.000,500.000,600.000),Vec(10.000,20.000,30.000),Vec(40.000,50.000,60.000)]
 tester|recv|[Vec(1.111,2.222,3.333),Vec(4.444,5.555,6.666)],1151.966,[Vec(100.000,200.000,300.000),Vec(400.000,500.000,600.000),Vec(10.000,20.000,30.000),Vec(40.000,50.000,60.000)]
+
+tester|send|786,["Rachael","Jacob","Nathan","Adam"],3.142
+StringIn|recv|786,["Rachael","Jacob","Nathan","Adam"],3.142
+StringIn|send|None
+tester|recv|None
+
+tester|send|12321
+StringOut|recv|12321
+StringOut|send|["Jan","February","MaRzO"],-113.311
+tester|recv|["Jan","February","MaRzO"],-113.311
+
+tester|send|17761
+StringRet|recv|17761
+StringRet|send|["Enero","Febrero","Marzo","Abril"]
+tester|recv|["Enero","Febrero","Marzo","Abril"]
+
+tester|send|73716,["One","Two","Three","Four","Five","Six"]
+StringInOutRet|recv|73716,["One","Two","Three","Four","Five","Six"]
+StringInOutRet|send|["Origin","Rebates","Foreseen","Abner"],77.115,["Battery","Mouse","Pad","Charger","Cord"]
+tester|recv|["Origin","Rebates","Foreseen","Abner"],77.115,["Battery","Mouse","Pad","Charger","Cord"]
 
 '''
 

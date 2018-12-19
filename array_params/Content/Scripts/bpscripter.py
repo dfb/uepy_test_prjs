@@ -160,7 +160,148 @@ def GetReturnNode(graph):
 Utils = FindBP('/Game/Utils.Utils').GeneratedClass
 from unreal_engine.classes import TestRecorder, TestActor
 
-if 1:
+if 0:
+    # StringInOutRet
+    bp = FindBP('/Game/BTestActor.BTestActor')
+    graph = GetFunctionGraph(bp, 'StringInOutRet')
+    entry = NodeWrapper(graph.Nodes[0])
+    argsStr = MakeArgsStr(graph, (entry.i, Utils.StrInt), (entry.inStrings, Utils.StrStringArray))
+    recvNote = TestRecorderNote(graph, 'StringInOutRet', 'recv', argsStr.ReturnValue, entry.then)
+    outArray = MakeArray(graph, ['Origin','Rebates','Foreseen','Abner'])
+    outF = MakeLiteral(graph, 77.115)
+    retArray = MakeArray(graph, ['Battery', 'Mouse', 'Pad', 'Charger', 'Cord'])
+    argsStr = MakeArgsStr(graph, (outArray.Array, Utils.StrStringArray), (outF.ReturnValue, Utils.StrFloat), (retArray.Array, Utils.StrStringArray))
+    sendNote = TestRecorderNote(graph, 'StringInOutRet', 'send', argsStr.ReturnValue, recvNote.then)
+    ret = GetReturnNode(graph)
+    ret.execute = sendNote.then
+    ret.outStrings = outArray.Array
+    ret.of = outF.ReturnValue
+    ret.ReturnValue = retArray.Array
+
+if 0:
+    # TestStringInOutRet
+    bp = FindBP('/Game/BTester.BTester')
+    graph = ue.blueprint_add_function(bp, 'TestStringInOutRet')
+    entry = graph.Nodes[0]
+    i = MakeLiteral(graph, 73716)
+    a = MakeArray(graph, ['One','Two','Three','Four','Five','Six'])
+    argsStr = MakeArgsStr(graph, (i.ReturnValue, Utils.StrInt), (a.Array, Utils.StrStringArray))
+    preNote = TestRecorderNote(graph, 'tester', 'send', argsStr.ReturnValue, entry.node_find_pin('then'))
+    ta = GetVariable(graph, 'TestActor')
+    taCall = MakeCall(graph, TestActor.StringInOutRet)
+    taCall.self = ta.TestActor
+    taCall.i = i.ReturnValue
+    taCall.inStrings = a.Array
+    taCall.execute = preNote.then
+    argsStr = MakeArgsStr(graph, (taCall.outStrings, Utils.StrStringArray), (taCall.of, Utils.StrFloat), (taCall.ReturnValue, Utils.StrStringArray))
+    TestRecorderNote(graph, 'tester', 'recv', argsStr.ReturnValue, taCall.then)
+
+if 0:
+    # StringRet
+    bp = FindBP('/Game/BTestActor.BTestActor')
+    graph = GetFunctionGraph(bp, 'StringRet')
+    entry = NodeWrapper(graph.Nodes[0])
+    argsStr = MakeArgsStr(graph, (entry.i, Utils.StrInt))
+    recvNote = TestRecorderNote(graph, 'StringRet', 'recv', argsStr.ReturnValue, entry.then)
+    array = MakeArray(graph, ['Enero', 'Febrero', 'Marzo', 'Abril'])
+    argsStr = MakeArgsStr(graph, (array.Array, Utils.StrStringArray))
+    sendNote = TestRecorderNote(graph, 'StringRet', 'send', argsStr.ReturnValue, recvNote.then)
+    ret = GetReturnNode(graph)
+    ret.execute = sendNote.then
+    ret.ReturnValue = array.Array
+
+if 0:
+    # TestStringRet
+    bp = FindBP('/Game/BTester.BTester')
+    try:
+        GetFunctionGraph(bp, 'TestStringRet')
+        raise Exception('Delete function first!')
+    except AssertionError:
+        pass
+    graph = ue.blueprint_add_function(bp, 'TestStringRet')
+    entry = graph.Nodes[0]
+    i = MakeLiteral(graph, 17761)
+    argsStr = MakeArgsStr(graph, (i.ReturnValue, Utils.StrInt))
+    preNote = TestRecorderNote(graph, 'tester', 'send', argsStr.ReturnValue, entry.node_find_pin('then'))
+    ta = GetVariable(graph, 'TestActor')
+    taCall = MakeCall(graph, TestActor.StringRet)
+    taCall.self = ta.TestActor
+    taCall.i = i.ReturnValue
+    taCall.execute = preNote.then
+    argsStr = MakeArgsStr(graph, (taCall.ReturnValue, Utils.StrStringArray))
+    TestRecorderNote(graph, 'tester', 'recv', argsStr.ReturnValue, taCall.then)
+
+if 0:
+    # StringOut
+    bp = FindBP('/Game/BTestActor.BTestActor')
+    graph = GetFunctionGraph(bp, 'StringOut')
+    entry = NodeWrapper(graph.Nodes[0])
+    argsStr = MakeArgsStr(graph, (entry.i, Utils.StrInt))
+    recvNote = TestRecorderNote(graph, 'StringOut', 'recv', argsStr.ReturnValue, entry.then)
+    array = MakeArray(graph, ['Jan', 'February', 'MaRzO'])
+    of = MakeLiteral(graph, -113.311)
+    argsStr = MakeArgsStr(graph, (array.Array, Utils.StrStringArray), (of.ReturnValue, Utils.StrFloat))
+    sendNote = TestRecorderNote(graph, 'StringOut', 'send', argsStr.ReturnValue, recvNote.then)
+    ret = GetReturnNode(graph)
+    ret.execute = sendNote.then
+    ret.strings = array.Array
+    ret.of = of.ReturnValue
+
+if 0:
+    # TestStringOut
+    bp = FindBP('/Game/BTester.BTester')
+    try:
+        GetFunctionGraph(bp, 'TestStringOut')
+        raise Exception('Delete function first!')
+    except AssertionError:
+        pass
+    graph = ue.blueprint_add_function(bp, 'TestStringOut')
+    entry = graph.Nodes[0]
+    i = MakeLiteral(graph, 12321)
+    argsStr = MakeArgsStr(graph, (i.ReturnValue, Utils.StrInt))
+    preNote = TestRecorderNote(graph, 'tester', 'send', argsStr.ReturnValue, entry.node_find_pin('then'))
+    ta = GetVariable(graph, 'TestActor')
+    taCall = MakeCall(graph, TestActor.StringOut)
+    taCall.self = ta.TestActor
+    taCall.i = i.ReturnValue
+    taCall.execute = preNote.then
+    argsStr = MakeArgsStr(graph, (taCall.strings, Utils.StrStringArray), (taCall.of, Utils.StrFloat))
+    TestRecorderNote(graph, 'tester', 'recv', argsStr.ReturnValue, taCall.then)
+
+if 0:
+    # StringIn
+    bp = FindBP('/Game/BTestActor.BTestActor')
+    graph = bp.UberGraphPages[0]
+    entry = GetEventNode(bp, 'StringIn')
+    argsStr = MakeArgsStr(graph, (entry.i, Utils.StrInt), (entry.strings, Utils.StrStringArray), (entry.f, Utils.StrFloat))
+    recvNote = TestRecorderNote(graph, 'StringIn', 'recv', argsStr.ReturnValue, entry.then)
+    sendNote = TestRecorderNote(graph, 'StringIn', 'send', 'None', recvNote.then)
+
+if 0:
+    # TestStringIn
+    bp = FindBP('/Game/BTester.BTester')
+    try:
+        GetFunctionGraph(bp, 'TestStringIn')
+        raise Exception('Delete function first!')
+    except AssertionError:
+        pass
+    graph = ue.blueprint_add_function(bp, 'TestStringIn')
+    entry = graph.Nodes[0]
+    i = MakeLiteral(graph, 786)
+    array = MakeArray(graph, ['Rachael', 'Jacob', 'Nathan', 'Adam'])
+    f = MakeLiteral(graph, 3.142)
+    argsStr = MakeArgsStr(graph, (i.ReturnValue, Utils.StrInt), (array.Array, Utils.StrStringArray), (f.ReturnValue, Utils.StrFloat))
+    preNote = TestRecorderNote(graph, 'tester', 'send', argsStr.ReturnValue, entry.node_find_pin('then'))
+    ta = GetVariable(graph, 'TestActor')
+    taCall = MakeCall(graph, TestActor.StringIn)
+    taCall.self = ta.TestActor
+    taCall.i = i.ReturnValue
+    taCall.strings = array.Array
+    taCall.f = f.ReturnValue
+    taCall.execute = preNote.then
+    TestRecorderNote(graph, 'tester', 'recv', 'None', taCall.then)
+
+if 0:
     # VectorInOutRet
     bp = FindBP('/Game/BTestActor.BTestActor')
     graph = GetFunctionGraph(bp, 'VectorInOutRet')
@@ -431,197 +572,4 @@ if 0:
     # (not needed here)
 
     TestRecorderNote(graph, 'tester', 'recv', 'None', taCall.then)
-
-if 0:
-    Utils = FindBP('/Game/Utils.Utils').GeneratedClass
-    bp = FindBP('/Game/BTestActor.BTestActor', True)
-    log(bp)
-
-    ug = bp.UberGraphPages[0]
-    recorder = GetVariable(ug, 'Recorder')
-    note = MakeCall(ug, TestRecorder.Note)
-    note.self = recorder.Recorder
-    note.who = 'barney'
-    note.action = 'recv'
-
-if 0:
-    convert = MakeCall(ug, Utils.Convert_I_IA_F)
-    convert.i = MakeLiteral(ug, 32).ReturnValue
-    convert.ia = MakeArray(ug, [1000, 500, 400, 300, 200]).Array
-    convert.f = MakeLiteral(ug, 12.34).ReturnValue
-
-    totext = MakeCall(ug, KTL.Conv_StringToText)
-    totext.InString = convert.s
-    printtext = MakeCall(ug, KSL.PrintText)
-    printtext.InText = totext.ReturnValue
-
-if 0:
-
-    import unittest
-    import unreal_engine as ue
-    from unreal_engine.classes import Actor, Character
-    from unreal_engine import FVector
-    import time
-    import math
-
-    class TestBlueprint(unittest.TestCase):
-
-        def setUp(self):
-            self.world = ue.get_editor_world()
-            self.random_string = str(int(time.time()))
-
-
-        def tearDown(self):
-            ue.allow_actor_script_execution_in_editor(False)
-
-        def test_creation(self):
-            new_blueprint = ue.create_blueprint(Actor, '/Game/Tests/Blueprints/Test0_' + self.random_string)
-            ue.log(new_blueprint.ParentClass)
-            self.assertEqual(new_blueprint.ParentClass, Actor)
-            self.assertNotEqual(new_blueprint.ParentClass, Character)
-
-        def test_spawn(self):
-            new_blueprint = ue.create_blueprint(Character, '/Game/Tests/Blueprints/Test1_' + self.random_string)
-            new_actor = self.world.actor_spawn(new_blueprint.GeneratedClass)
-            self.assertTrue(new_actor.is_a(Character))
-
-        def test_variable(self):
-            new_blueprint = ue.create_blueprint(Character, '/Game/Tests/Blueprints/Test2_' + self.random_string)
-            ue.blueprint_add_member_variable(new_blueprint, 'TestValue', 'int')
-            ue.compile_blueprint(new_blueprint)
-            new_actor = self.world.actor_spawn(new_blueprint.GeneratedClass)
-            new_actor.TestValue = 17
-            self.assertEqual(new_actor.get_property('TestValue'), 17)
-
-        def test_event(self):
-            new_blueprint = ue.create_blueprint(Character, '/Game/Tests/Blueprints/Test3_' + self.random_string)
-            uber_page = new_blueprint.UberGraphPages[0]
-            x, y = uber_page.graph_get_good_place_for_new_node()
-            test_event = uber_page.graph_add_node_custom_event('TestEvent', x, y)
-            x, y = uber_page.graph_get_good_place_for_new_node()
-            node_set_actor_location = uber_page.graph_add_node_call_function(Actor.K2_SetActorLocation, x, y)
-            test_event.node_find_pin('then').make_link_to(node_set_actor_location.node_find_pin('execute'))
-            node_set_actor_location.node_find_pin('NewLocation').default_value = '17,30,22'
-            ue.compile_blueprint(new_blueprint)
-            new_actor = self.world.actor_spawn(new_blueprint.GeneratedClass)
-            self.assertEqual(new_actor.get_actor_location(), FVector(0, 0, 0))
-            ue.allow_actor_script_execution_in_editor(True)
-            new_actor.TestEvent()
-            self.assertEqual(new_actor.get_actor_location(), FVector(17, 30, 22))
-
-
-    if __name__ == '__main__':
-        unittest.main(exit=False)
-
-        import unreal_engine as ue
-        from unreal_engine.classes import Blueprint, K2Node_DynamicCast, Actor, Object
-        from unreal_engine.structs import EdGraphPinType
-        from unreal_engine.enums import EEdGraphPinDirection
-
-        bp_foo = ue.load_object(Blueprint, '/Game/Foo.Foo')
-        bp_bar = ue.load_object(Blueprint, '/Game/Bar.Bar')
-
-        cast_node = K2Node_DynamicCast()
-        cast_node.TargetType = bp_bar.GeneratedClass
-
-        graph = ue.blueprint_add_function(bp_foo, 'FooCaster')
-        func = graph.Nodes[0]
-
-        pin_type = EdGraphPinType(PinCategory = 'object', PinSubCategoryObject=Actor)
-        pin = func.node_create_pin(EEdGraphPinDirection.EGPD_Input, pin_type, 'Arg001')
-
-
-        graph.graph_add_node(cast_node, 600, 0)
-
-        cast_node.node_find_pin('Object').category = 'object'
-        cast_node.node_find_pin('Object').sub_category = Object
-
-        pin.make_link_to(cast_node.node_find_pin('Object'))
-        func.node_find_pin('then').make_link_to(cast_node.node_find_pin('execute'))
-
-        ue.compile_blueprint(bp_foo)
-
-# ----------------------
-
-    import unreal_engine as ue
-
-    from unreal_engine.classes import Material, BlueprintFactory, Blueprint, Actor, Texture2D, SkeletalMesh
-    from unreal_engine.structs import EdGraphPinType, Vector, Rotator, EdGraphTerminalType
-    from unreal_engine.enums import EPinContainerType
-
-    import time
-
-    bp = ue.create_blueprint(Actor, '/Game/FooActor' + str(int(time.time())))
-
-    pin = EdGraphPinType(PinCategory='object', PinSubCategoryObject=Material)
-    ue.blueprint_add_member_variable(bp, 'TestMat', pin, None, '/Engine/MapTemplates/Materials/BasicAsset03.BasicAsset03')
-
-    pin = EdGraphPinType(PinCategory='class', PinSubCategoryObject=Texture2D)
-    ue.blueprint_add_member_variable(bp, 'TestTextureClass', pin)
-
-    pin = EdGraphPinType(PinCategory='struct',PinSubCategoryObject=Vector)
-    ue.blueprint_add_member_variable(bp, 'TestVector', pin, None, '17,22,30')
-
-    pin = EdGraphPinType(PinCategory='struct',PinSubCategoryObject=Rotator,ContainerType=EPinContainerType.Array)
-    ue.blueprint_add_member_variable(bp, 'TestRotator', pin, None, '((Pitch=0.000000,Yaw=3.000000,Roll=0.000000),(Pitch=1.000000,Yaw=0.000000,Roll=0.000000))')
-
-    pin = EdGraphPinType(PinCategory='string',ContainerType=EPinContainerType.Map,PinValueType=EdGraphTerminalType(TerminalCategory='object',TerminalSubCategoryObject=SkeletalMesh))
-    ue.blueprint_add_member_variable(bp, 'TestMap', pin, None, '(("firstKey", SkeletalMesh\'"/Game/Skel001"\'),("secondKey", SkeletalMesh\'"/Game/Skel002"\'))')
-
-    ue.compile_blueprint(bp)
-
-    ue.open_editor_for_asset(bp)
-
-# ---------------------
-
-
-    import unreal_engine as ue
-    from unreal_engine.classes import BlueprintFactory, DirectionalLightComponent, K2Node_Event
-
-    import time
-
-# create new blueprint from factory
-    bpFactory = BlueprintFactory()
-    bp = bpFactory.factory_create_new('/Game/test' + str(int(time.time())))
-
-# add intensity variable
-    intensity = ue.blueprint_add_member_variable(bp, 'intensity', 'float')
-# set its visibility to True
-    ue.blueprint_set_variable_visibility(bp, 'intensity', True)
-
-# add directional light component
-    directLightComponent = ue.add_component_to_blueprint(bp,DirectionalLightComponent, "Directional_light")
-
-# add node variables (get) to the graph
-    intensity_node = bp.UberGraphPages[0].graph_add_node_variable_get('intensity', None, 200, 100)
-    directional_light_node = bp.UberGraphPages[0].graph_add_node_variable_get('Directional_light', None, 200, 0)
-
-# add the SetIntensity node (from DirectionalLightComponent)
-    directional_light_set_intensity = bp.UberGraphPages[0].graph_add_node_call_function(DirectionalLightComponent.SetIntensity, 400, 0)
-
-# link variables
-    intensity_node.node_find_pin('intensity').make_link_to(directional_light_set_intensity.node_find_pin('NewIntensity'))
-    directional_light_node.node_find_pin('Directional_light').make_link_to(directional_light_set_intensity.node_find_pin('self'))
-
-# a commodity function for finding an event node
-    def get_event_node(event_name):
-        for node in bp.UberGraphPages[0].Nodes:
-            if node.is_a(K2Node_Event):
-                if node.EventReference.MemberName == event_name:
-                    return node
-
-# get the ReceiveBeginPlay event node
-    begin_play_node = get_event_node('ReceiveBeginPlay')
-
-# link BeginPlay to SetIntensity
-    begin_play_node.node_find_pin('then').make_link_to(directional_light_set_intensity.node_find_pin('execute'))
-
-# compile the blueprint
-    ue.compile_blueprint(bp)
-
-# open related editor
-    ue.open_editor_for_asset(bp)
-
-# spawn it
-    ue.get_editor_world().actor_spawn(bp.GeneratedClass)
 

@@ -13,6 +13,19 @@ void ATestRecorder::Note(FString who, FString action, FString args)
     //LOG("%s", *line);
 }
 
+FString Str(const FString s)
+{
+    return FString::Printf(_T("\"%s\""), *s);
+}
+
+FString Str(const TArray<FString>& params)
+{
+    TArray<FString> parts;
+    for (auto& p : params)
+        parts.Emplace(Str(p));
+    return FString::Printf(_T("[%s]"), *FString::Join(parts, _T(",")));
+}
+
 FString Str(const FVector& v)
 {
     return FString::Printf(_T("Vec(%.3f,%.3f,%.3f)"), v.X, v.Y, v.Z);
@@ -181,23 +194,48 @@ TArray<FVector> ATestActor::VectorInOutRet_Implementation(int i, const TArray<FV
     return ret;
 }
 
-void ATestActor::StringIn_Implementation(int i, const TArray<FString>& strings, float f)
+void ATestActor::StringIn_Implementation(int i, const TArray<FString>& inputs, float f)
 {
+    FString args = FString::Printf(_T("%d,%s,%.3f"), i, *Str(inputs), f);
+    recorder->Note(_T("StringIn"), _T("recv"), *args);
+    recorder->Note(_T("StringIn"), _T("send"), _T("None"));
 }
 
-void ATestActor::StringOut_Implementation(int i, TArray<FString>& strings, float& of)
+void ATestActor::StringOut_Implementation(int i, TArray<FString>& outputs, float& of)
 {
+    FString args = FString::Printf(_T("%d"), i);
+    recorder->Note(_T("StringOut"), _T("recv"), *args);
+    outputs.Empty();
+    outputs.Emplace(_T("Jan"));
+    outputs.Emplace(_T("February"));
+    outputs.Emplace(_T("MaRzO"));
+    of = -113.311;
+    args = FString::Printf(_T("%s,%.3f"), *Str(outputs), of);
+    recorder->Note(_T("StringOut"), _T("send"), *args);
 }
 
 TArray<FString> ATestActor::StringRet_Implementation(int i)
 {
-    TArray<FString> ret;
+    FString args = FString::Printf(_T("%d"), i);
+    recorder->Note(_T("StringRet"), _T("recv"), *args);
+    TArray<FString> ret = {_T("Enero"), _T("Febrero"), _T("Marzo"), _T("Abril")};
+    recorder->Note(_T("StringRet"), _T("send"), *Str(ret));
     return ret;
 }
 
-TArray<FString> ATestActor::StringInOutRet_Implementation(int i, const TArray<FString>& inStrings, TArray<FString>& outStrings, float& of)
+TArray<FString> ATestActor::StringInOutRet_Implementation(int i, const TArray<FString>& inParam, TArray<FString>& outParam, float& of)
 {
-    TArray<FString> ret;
+    FString args = FString::Printf(_T("%d,%s"), i, *Str(inParam));
+    recorder->Note(_T("StringInOutRet"), _T("recv"), *args);
+    of = 77.115;
+    outParam.Empty();
+    outParam.Emplace(_T("Origin"));
+    outParam.Emplace(_T("Rebates"));
+    outParam.Emplace(_T("Foreseen"));
+    outParam.Emplace(_T("Abner"));
+    TArray<FString> ret = {_T("Battery"),_T("Mouse"),_T("Pad"),_T("Charger"),_T("Cord")};
+    args = FString::Printf(_T("%s,%.3f,%s"), *Str(outParam), of, *Str(ret));
+    recorder->Note(_T("StringInOutRet"), _T("send"), *args);
     return ret;
 }
 
@@ -359,6 +397,46 @@ void ATester::RunTests(ATestRecorder *recorder, ATestActor *callee)
         float of = 0.0f;
         TArray<FVector> retParam, outParam;
         retParam = callee->VectorInOutRet(i, inParam, outParam, of);
+        args = FString::Printf(_T("%s,%.3f,%s"), *Str(outParam), of, *Str(retParam));
+        recorder->Note(_T("tester"), _T("recv"), args);
+    }
+
+    // string
+    {
+        int i = 786;
+        TArray<FString> inParam = {_T("Rachael"), _T("Jacob"), _T("Nathan"), _T("Adam")};
+        float f = 3.142;
+        FString args = FString::Printf(_T("%d,%s,%.3f"), i, *Str(inParam), f);
+        recorder->Note(_T("tester"), _T("send"), *args);
+        callee->StringIn(i, inParam, f);
+        recorder->Note(_T("tester"), _T("recv"), _T("None"));
+    }
+    {
+        int i = 12321;
+        TArray<FString> outParam;
+        float f;
+        FString args = FString::Printf(_T("%d"), i);
+        recorder->Note(_T("tester"), _T("send"), args);
+        callee->StringOut(i, outParam, f);
+        args = FString::Printf(_T("%s,%.3f"), *Str(outParam), f);
+        recorder->Note(_T("tester"), _T("recv"), args);
+    }
+    {
+        int i = 17761;
+        FString args = FString::Printf(_T("%d"), i);
+        recorder->Note(_T("tester"), _T("send"), args);
+        TArray<FString> retParam = callee->StringRet(i);
+        args = FString::Printf(_T("%s"), *Str(retParam));
+        recorder->Note(_T("tester"), _T("recv"), args);
+    }
+    {
+        int i = 73716;
+        TArray<FString> inParam = {_T("One"), _T("Two"), _T("Three"), _T("Four"), _T("Five"), _T("Six")};
+        FString args = FString::Printf(_T("%d,%s"), i, *Str(inParam));
+        recorder->Note(_T("tester"), _T("send"), args);
+        float of = 0.0f;
+        TArray<FString> retParam, outParam;
+        retParam = callee->StringInOutRet(i, inParam, outParam, of);
         args = FString::Printf(_T("%s,%.3f,%s"), *Str(outParam), of, *Str(retParam));
         recorder->Note(_T("tester"), _T("recv"), args);
     }
