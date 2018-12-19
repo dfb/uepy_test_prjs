@@ -28,6 +28,7 @@ def sarg(arg):
     if type(arg) is list: return '[%s]' % (','.join(sarg(x) for x in arg))
     if type(arg) is tuple: return sargs(arg)
     if type(arg) is bool: return str(int(arg))
+    if type(arg) is FVector: return 'Vec(%.3f,%.3f,%.3f)' % (arg.x, arg.y, arg.z)
     assert 0, repr(arg)
 
 def sargs(*args):
@@ -78,6 +79,11 @@ class PTester(CTester):
         PCall('tester', callee, 'BoolRet', 6991)
         PCall('tester', callee, 'BoolInOutRet', 32711, [False, False, True, False, False, True, False, True, True, True])
 
+        PCall('tester', callee, 'VectorIn', 3819, [FVector(1,2,3), FVector(4,5,6)], 117.880)
+        PCall('tester', callee, 'VectorOut', 7777)
+        PCall('tester', callee, 'VectorRet', 5110)
+        PCall('tester', callee, 'VectorInOutret', 99411, [FVector(10,11,12),FVector(13,14,15),FVector(16,17,18),FVector(19,20,-21)])
+
 class PTestActor(CTestActor):
     def IntIn(self, i:int, ints:[int], f:float):
         tr.Note('IntIn', 'recv', sargs(i, ints, f))
@@ -121,6 +127,29 @@ class PTestActor(CTestActor):
         tr.Note('BoolInOutRet', 'send', sretargs(ret))
         return ret
 
+    def VectorIn(self, i:int, vectors:[FVector], f:float):
+        tr.Note('VectorIn', 'recv', sargs(i, vectors, f))
+        tr.Note('VectorIn', 'send', 'None')
+
+    def VectorOut(self, i:int) -> ([FVector], float):
+        tr.Note('VectorOut', 'recv', sargs(i))
+        ret = [FVector(5.5, 4.5, 3.5),FVector(-1.2, -10, 5000),FVector(17.125, -105.177, 32.111)], 99.101
+        tr.Note('VectorOut', 'send', sretargs(ret))
+        return ret
+
+    def VectorRet(self, i:int) -> [FVector]:
+        tr.Note('VectorRet', 'recv', sargs(i))
+        ret = [FVector(11.225,-5.0,33.333), FVector(5,4,3), FVector(-1,-10,-100)]
+        tr.Note('VectorRet', 'send', sretargs(ret))
+        return ret
+
+    def VectorInOutRet(self, i:int, inVectors:[FVector]) -> ([FVector], float, [FVector]):
+        tr.Note('VectorInOutRet', 'recv', sargs(i, inVectors))
+        ret = [True, False, False, True, True, True, True, True, False], 1125.865, [True, True, False, False, False, True, False, False, True, True]
+        ret = [FVector(1.111,2.222,3.333), FVector(4.444,5.555,6.666)], 1151.966, \
+                [FVector(100.000,200.000,300.000), FVector(400.000,500.000,600.000), FVector(10.000,20.000,30.000), FVector(40.000,50.000,60.000)]
+        tr.Note('VectorInOutRet', 'send', sretargs(ret))
+        return ret
 
 EXPECTED = '''
 tester|send|10,[55,57,59,61],3.500
@@ -161,6 +190,27 @@ tester|send|32711,[0,0,1,0,0,1,0,1,1,1]
 BoolInOutRet|recv|32711,[0,0,1,0,0,1,0,1,1,1]
 BoolInOutRet|send|[1,0,0,1,1,1,1,1,0],1125.865,[1,1,0,0,0,1,0,0,1,1]
 tester|recv|[1,0,0,1,1,1,1,1,0],1125.865,[1,1,0,0,0,1,0,0,1,1]
+
+
+tester|send|3819,[Vec(1.000,2.000,3.000),Vec(4.000,5.000,6.000)],117.880
+VectorIn|recv|3819,[Vec(1.000,2.000,3.000),Vec(4.000,5.000,6.000)],117.880
+VectorIn|send|None
+tester|recv|None
+
+tester|send|7777
+VectorOut|recv|7777
+VectorOut|send|[Vec(5.500,4.500,3.500),Vec(-1.200,-10.000,5000.000),Vec(17.125,-105.177,32.111)],99.101
+tester|recv|[Vec(5.500,4.500,3.500),Vec(-1.200,-10.000,5000.000),Vec(17.125,-105.177,32.111)],99.101
+
+tester|send|5110
+VectorRet|recv|5110
+VectorRet|send|[Vec(11.225,-5.000,33.333),Vec(5.000,4.000,3.000),Vec(-1.000,-10.000,-100.000)]
+tester|recv|[Vec(11.225,-5.000,33.333),Vec(5.000,4.000,3.000),Vec(-1.000,-10.000,-100.000)]
+
+tester|send|99411,[Vec(10.000,11.000,12.000),Vec(13.000,14.000,15.000),Vec(16.000,17.000,18.000),Vec(19.000,20.000,-21.000)]
+VectorInOutRet|recv|99411,[Vec(10.000,11.000,12.000),Vec(13.000,14.000,15.000),Vec(16.000,17.000,18.000),Vec(19.000,20.000,-21.000)]
+VectorInOutRet|send|[Vec(1.111,2.222,3.333),Vec(4.444,5.555,6.666)],1151.966,[Vec(100.000,200.000,300.000),Vec(400.000,500.000,600.000),Vec(10.000,20.000,30.000),Vec(40.000,50.000,60.000)]
+tester|recv|[Vec(1.111,2.222,3.333),Vec(4.444,5.555,6.666)],1151.966,[Vec(100.000,200.000,300.000),Vec(400.000,500.000,600.000),Vec(10.000,20.000,30.000),Vec(40.000,50.000,60.000)]
 
 '''
 

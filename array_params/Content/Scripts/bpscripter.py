@@ -43,16 +43,23 @@ class NodeWrapper:
             raise Exception('Pin', pin, 'must be connected to a pin, not a node wrapper')
         else:
             # otherwise triggers setting its default value
-            log('setting default', pin, v)
+            #log('setting default', pin, v)
             pin.default_value = str(v)
             self._node.node_pin_default_value_changed(pin)
 
+def ObjToStr(o):
+    if type(o) is FVector:
+        return '%.08f, %.08f, %.08f' % (o.x, o.y, o.z)
+    return str(o)
+
+from unreal_engine.structs import Vector as StructVector # this is *not* FVector
 def MakeArray(graph, values, pos=None):
     if pos is None:
         pos = graph.graph_get_good_place_for_new_node()
     node = graph.graph_add_node(K2Node_MakeArray, *pos)
     node.NumInputs = len(values)
     node.node_reconstruct()
+    sub = None
     t = type(values[0])
     if t is int:
         pinType = 'int'
@@ -60,15 +67,22 @@ def MakeArray(graph, values, pos=None):
         pinType = 'bool'
     elif t is str:
         pinType = 'string'
+    elif t is FVector:
+        pinType = 'struct'
+        sub = StructVector
     else:
         assert 0, t
     for i, val in enumerate(values):
         pin = node.node_find_pin('[%d]' % i)
         pin.category = pinType
-        pin.default_value = str(val)
+        if sub is not None:
+            pin.sub_category = sub
+        pin.default_value = ObjToStr(val)
         node.node_pin_default_value_changed(pin)
     w = NodeWrapper(node)
     w.Array.category = pinType
+    if sub is not None:
+        w.Array.sub_category = sub
     return w
 
 def MakeLiteral(graph, value, pos=None):
@@ -131,6 +145,12 @@ def GetFunctionGraph(bp, name):
             return graph
     assert 0, 'Function %s not found' % name
 
+def GetEventNode(bp, name):
+    for node in bp.UberGraphPages[0].Nodes:
+        if node.is_a(K2Node_Event) and node.EventReference.MemberName == name:
+            return NodeWrapper(node)
+    assert 0, 'Event %s not found' % name
+
 def GetReturnNode(graph):
     for node in graph.Nodes:
         if node.is_a(K2Node_FunctionResult):
@@ -139,6 +159,148 @@ def GetReturnNode(graph):
 
 Utils = FindBP('/Game/Utils.Utils').GeneratedClass
 from unreal_engine.classes import TestRecorder, TestActor
+
+if 1:
+    # VectorInOutRet
+    bp = FindBP('/Game/BTestActor.BTestActor')
+    graph = GetFunctionGraph(bp, 'VectorInOutRet')
+    entry = NodeWrapper(graph.Nodes[0])
+    argsStr = MakeArgsStr(graph, (entry.i, Utils.StrInt), (entry.inVectors, Utils.StrVectorArray))
+    recvNote = TestRecorderNote(graph, 'VectorInOutRet', 'recv', argsStr.ReturnValue, entry.then)
+
+    outArray = MakeArray(graph, [FVector(1.111,2.222,3.333), FVector(4.444,5.555,6.666)])
+    outF = MakeLiteral(graph, 1151.966)
+    retArray = MakeArray(graph, [FVector(100.000,200.000,300.000), FVector(400.000,500.000,600.000), FVector(10.000,20.000,30.000), FVector(40.000,50.000,60.000)])
+    argsStr = MakeArgsStr(graph, (outArray.Array, Utils.StrVectorArray), (outF.ReturnValue, Utils.StrFloat), (retArray.Array, Utils.StrVectorArray))
+    sendNote = TestRecorderNote(graph, 'VectorInOutRet', 'send', argsStr.ReturnValue, recvNote.then)
+    ret = GetReturnNode(graph)
+    ret.execute = sendNote.then
+    ret.outVectors = outArray.Array
+    ret.of = outF.ReturnValue
+    ret.ReturnValue = retArray.Array
+
+if 0:
+    # TestVectorInOutRet
+    bp = FindBP('/Game/BTester.BTester')
+    graph = ue.blueprint_add_function(bp, 'TestVectorInOutRet')
+    entry = graph.Nodes[0]
+    i = MakeLiteral(graph, 99411)
+    a = MakeArray(graph, [FVector(10,11,12),FVector(13,14,15),FVector(16,17,18),FVector(19,20,-21)])
+    argsStr = MakeArgsStr(graph, (i.ReturnValue, Utils.StrInt), (a.Array, Utils.StrVectorArray))
+    preNote = TestRecorderNote(graph, 'tester', 'send', argsStr.ReturnValue, entry.node_find_pin('then'))
+    ta = GetVariable(graph, 'TestActor')
+    taCall = MakeCall(graph, TestActor.VectorInOutRet)
+    taCall.self = ta.TestActor
+    taCall.i = i.ReturnValue
+    taCall.inVectors = a.Array
+    taCall.execute = preNote.then
+    argsStr = MakeArgsStr(graph, (taCall.outVectors, Utils.StrVectorArray), (taCall.of, Utils.StrFloat), (taCall.ReturnValue, Utils.StrVectorArray))
+    TestRecorderNote(graph, 'tester', 'recv', argsStr.ReturnValue, taCall.then)
+
+if 0:
+    # VectorRet
+    bp = FindBP('/Game/BTestActor.BTestActor')
+    graph = GetFunctionGraph(bp, 'VectorRet')
+    entry = NodeWrapper(graph.Nodes[0])
+    argsStr = MakeArgsStr(graph, (entry.i, Utils.StrInt))
+    recvNote = TestRecorderNote(graph, 'VectorRet', 'recv', argsStr.ReturnValue, entry.then)
+    array = MakeArray(graph, [FVector(11.225,-5.0,33.333), FVector(5,4,3), FVector(-1,-10,-100)])
+    argsStr = MakeArgsStr(graph, (array.Array, Utils.StrVectorArray))
+    sendNote = TestRecorderNote(graph, 'VectorRet', 'send', argsStr.ReturnValue, recvNote.then)
+    ret = GetReturnNode(graph)
+    ret.execute = sendNote.then
+    ret.ReturnValue = array.Array
+
+if 0:
+    # TestVectorRet
+    bp = FindBP('/Game/BTester.BTester')
+    try:
+        GetFunctionGraph(bp, 'TestVectorRet')
+        raise Exception('Delete function first!')
+    except AssertionError:
+        pass
+    graph = ue.blueprint_add_function(bp, 'TestVectorRet')
+    entry = graph.Nodes[0]
+    i = MakeLiteral(graph, 5110)
+    argsStr = MakeArgsStr(graph, (i.ReturnValue, Utils.StrInt))
+    preNote = TestRecorderNote(graph, 'tester', 'send', argsStr.ReturnValue, entry.node_find_pin('then'))
+    ta = GetVariable(graph, 'TestActor')
+    taCall = MakeCall(graph, TestActor.VectorRet)
+    taCall.self = ta.TestActor
+    taCall.i = i.ReturnValue
+    taCall.execute = preNote.then
+    argsStr = MakeArgsStr(graph, (taCall.ReturnValue, Utils.StrVectorArray))
+    TestRecorderNote(graph, 'tester', 'recv', argsStr.ReturnValue, taCall.then)
+
+if 0:
+    # VectorOut
+    bp = FindBP('/Game/BTestActor.BTestActor')
+    graph = GetFunctionGraph(bp, 'VectorOut')
+    entry = NodeWrapper(graph.Nodes[0])
+    argsStr = MakeArgsStr(graph, (entry.i, Utils.StrInt))
+    recvNote = TestRecorderNote(graph, 'VectorOut', 'recv', argsStr.ReturnValue, entry.then)
+    array = MakeArray(graph, [FVector(5.5, 4.5, 3.5),FVector(-1.2, -10, 5000),FVector(17.125, -105.177, 32.111)])
+    of = MakeLiteral(graph, 99.101)
+    argsStr = MakeArgsStr(graph, (array.Array, Utils.StrVectorArray), (of.ReturnValue, Utils.StrFloat))
+    sendNote = TestRecorderNote(graph, 'VectorOut', 'send', argsStr.ReturnValue, recvNote.then)
+    ret = GetReturnNode(graph)
+    ret.execute = sendNote.then
+    ret.vectors = array.Array
+    ret.of = of.ReturnValue
+
+if 0:
+    # TestVectorOut
+    bp = FindBP('/Game/BTester.BTester')
+    try:
+        GetFunctionGraph(bp, 'TestVectorOut')
+        raise Exception('Delete function first!')
+    except AssertionError:
+        pass
+    graph = ue.blueprint_add_function(bp, 'TestVectorOut')
+    entry = graph.Nodes[0]
+    i = MakeLiteral(graph, 7777)
+    argsStr = MakeArgsStr(graph, (i.ReturnValue, Utils.StrInt))
+    preNote = TestRecorderNote(graph, 'tester', 'send', argsStr.ReturnValue, entry.node_find_pin('then'))
+    ta = GetVariable(graph, 'TestActor')
+    taCall = MakeCall(graph, TestActor.VectorOut)
+    taCall.self = ta.TestActor
+    taCall.i = i.ReturnValue
+    taCall.execute = preNote.then
+    argsStr = MakeArgsStr(graph, (taCall.vectors, Utils.StrVectorArray), (taCall.of, Utils.StrFloat))
+    TestRecorderNote(graph, 'tester', 'recv', argsStr.ReturnValue, taCall.then)
+
+if 0:
+    # VectorIn
+    bp = FindBP('/Game/BTestActor.BTestActor')
+    graph = bp.UberGraphPages[0]
+    entry = GetEventNode(bp, 'VectorIn')
+    argsStr = MakeArgsStr(graph, (entry.i, Utils.StrInt), (entry.vectors, Utils.StrVectorArray), (entry.f, Utils.StrFloat))
+    recvNote = TestRecorderNote(graph, 'VectorIn', 'recv', argsStr.ReturnValue, entry.then)
+    sendNote = TestRecorderNote(graph, 'VectorIn', 'send', 'None', recvNote.then)
+
+if 0:
+    # TestVectorIn
+    bp = FindBP('/Game/BTester.BTester')
+    try:
+        GetFunctionGraph(bp, 'TestVectorIn')
+        raise Exception('Delete function first!')
+    except AssertionError:
+        pass
+    graph = ue.blueprint_add_function(bp, 'TestVectorIn')
+    entry = graph.Nodes[0]
+    i = MakeLiteral(graph, 3819)
+    array = MakeArray(graph, [FVector(1,2,3),FVector(4,5,6)])
+    f = MakeLiteral(graph, 117.880)
+    argsStr = MakeArgsStr(graph, (i.ReturnValue, Utils.StrInt), (array.Array, Utils.StrVectorArray), (f.ReturnValue, Utils.StrFloat))
+    preNote = TestRecorderNote(graph, 'tester', 'send', argsStr.ReturnValue, entry.node_find_pin('then'))
+    ta = GetVariable(graph, 'TestActor')
+    taCall = MakeCall(graph, TestActor.VectorIn)
+    taCall.self = ta.TestActor
+    taCall.i = i.ReturnValue
+    taCall.vectors = array.Array
+    taCall.f = f.ReturnValue
+    taCall.execute = preNote.then
+    TestRecorderNote(graph, 'tester', 'recv', 'None', taCall.then)
 
 if 0:
     # BoolInOutRet
