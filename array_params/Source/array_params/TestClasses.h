@@ -29,6 +29,23 @@ struct FTestStruct
     UPROPERTY(BlueprintReadWrite, EditAnywhere) int number;
 };
 
+// this actor is used in the UObject parameter tests
+UCLASS()
+class ARRAY_PARAMS_API AParamActor : public AActor
+{
+    GENERATED_BODY()
+    FString _name;
+public:
+    UFUNCTION(BlueprintCallable) void SetTestName(FString n) { _name = n; }
+    UFUNCTION(BlueprintCallable) FString GetTestName() const { return _name; }
+
+    UFUNCTION(BlueprintCallable, Meta=(DefaultToSelf="WorldContextObject", HidePin="WorldContextObject"))
+    static void DestroyActors(UObject *WorldContextObject, const TArray<AParamActor *>& actors);
+
+    UFUNCTION(BlueprintCallable, Meta=(DefaultToSelf="WorldContextObject", HidePin="WorldContextObject"))
+    static AParamActor *SpawnWithName(UObject *WorldContextObject, FString withName);
+};
+
 // the class used for testing - implements methods with various combinations of in/out/return params
 UCLASS()
 class ARRAY_PARAMS_API ATestActor : public AActor
@@ -95,17 +112,17 @@ public:
     TArray<FString> StringInOutRet_Implementation(int i, const TArray<FString>& inStrings, TArray<FString>& outStrings, float& of);
 
     // UObject arrays (using Actors as the test object)
-    UFUNCTION(BlueprintCallable, BlueprintNativeEvent) void ActorIn(int i, const TArray<AActor*>& actors, float f);
-    void ActorIn_Implementation(int i, const TArray<AActor*>& actors, float f);
+    UFUNCTION(BlueprintCallable, BlueprintNativeEvent) void ActorIn(int i, const TArray<AParamActor*>& actors, float f);
+    void ActorIn_Implementation(int i, const TArray<AParamActor*>& actors, float f);
 
-    UFUNCTION(BlueprintCallable, BlueprintNativeEvent) void ActorOut(int i, TArray<AActor*>& actors, float& of);
-    void ActorOut_Implementation(int i, TArray<AActor*>& actors, float& of);
+    UFUNCTION(BlueprintCallable, BlueprintNativeEvent) void ActorOut(int i, TArray<AParamActor*>& actors, float& of);
+    void ActorOut_Implementation(int i, TArray<AParamActor*>& actors, float& of);
 
-    UFUNCTION(BlueprintCallable, BlueprintNativeEvent) TArray<AActor*> ActorRet(int i);
-    TArray<AActor*> ActorRet_Implementation(int i);
+    UFUNCTION(BlueprintCallable, BlueprintNativeEvent) TArray<AParamActor*> ActorRet(int i);
+    TArray<AParamActor*> ActorRet_Implementation(int i);
 
-    UFUNCTION(BlueprintCallable, BlueprintNativeEvent) TArray<AActor*> ActorInOutRet(int i, const TArray<AActor*>& inActors, TArray<AActor*>& outActors, float& of);
-    TArray<AActor*> ActorInOutRet_Implementation(int i, const TArray<AActor*>& inActors, TArray<AActor*>& outActors, float& of);
+    UFUNCTION(BlueprintCallable, BlueprintNativeEvent) TArray<AParamActor*> ActorInOutRet(int i, const TArray<AParamActor*>& inActors, TArray<AParamActor*>& outActors, float& of);
+    TArray<AParamActor*> ActorInOutRet_Implementation(int i, const TArray<AParamActor*>& inActors, TArray<AParamActor*>& outActors, float& of);
 
     // struct arrays (using FTestStruct as the test struct)
     UFUNCTION(BlueprintCallable, BlueprintNativeEvent) void StructIn(int i, const TArray<FTestStruct>& structs, float f);

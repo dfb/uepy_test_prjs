@@ -16,6 +16,7 @@ NEXT:
 
 from helpers import *
 from unreal_engine.classes import BlueprintGeneratedClass, Blueprint, Class, Class, Actor, TestRecorder, StrProperty
+from unreal_engine import UObject
 import difflib
 from typing import List
 ue.allow_actor_script_execution_in_editor(True)
@@ -29,7 +30,8 @@ def sarg(arg):
     if type(arg) is tuple: return sargs(arg)
     if type(arg) is bool: return str(int(arg))
     if type(arg) is FVector: return 'Vec(%.3f,%.3f,%.3f)' % (arg.x, arg.y, arg.z)
-    assert 0, repr(arg)
+    if type(arg) is UObject and arg.is_a(ParamActor): return 'Actor(%s)' % arg.GetTestName()
+    assert 0, (type(arg), arg)
 
 def sargs(*args):
     '''stringifies args in a consistent and easily comparable way'''
@@ -61,11 +63,16 @@ def PCall(caller, callee, method, *args):
     tr.Note(caller, 'send', sargs(*args))
     ret = getattr(callee, method)(*args)
     tr.Note(caller, 'recv', sretargs(ret))
+    return ret
 
 CTester = ue.load_object(Class, '/Script/array_params.Tester')
 BTester = ue.load_object(Blueprint, '/Game/BTester.BTester').GeneratedClass
 CTestActor = ue.load_object(Class, '/Script/array_params.TestActor')
 BTestActor = ue.load_object(Blueprint, '/Game/BTestActor.BTestActor').GeneratedClass
+ParamActor = ue.load_object(Class, '/Script/array_params.ParamActor')
+
+def ParamActorWithName(name):
+    return ParamActor.SpawnWithName(GetWorld(), name)
 
 class PTester(CTester):
     def RunTests(self, rec:TestRecorder, callee:CTestActor):
@@ -88,6 +95,23 @@ class PTester(CTester):
         PCall('tester', callee, 'StringOut', 12321)
         PCall('tester', callee, 'StringRet', 17761)
         PCall('tester', callee, 'StringInOutRet', 73716, ['One','Two','Three','Four','Five','Six'])
+
+        P = ParamActorWithName
+        actors = [P(x) for x in 'Joe Fred Jared Ed'.split()]
+        PCall('tester', callee, 'ActorIn', 13, actors, -689.123)
+        ParamActor.DestroyActors(GetWorld(), actors)
+
+        actors, of = PCall('tester', callee, 'ActorOut', 7455)
+        ParamActor.DestroyActors(GetWorld(), actors)
+
+        actors = PCall('tester', callee, 'ActorRet', 311111)
+        ParamActor.DestroyActors(GetWorld(), actors)
+
+        actors = [P(x) for x in 'Larry Curly Moe'.split()]
+        outActors, of, retActors = PCall('tester', callee, 'ActorInOutRet', 8675309, actors)
+        ParamActor.DestroyActors(GetWorld(), actors)
+        ParamActor.DestroyActors(GetWorld(), outActors)
+        ParamActor.DestroyActors(GetWorld(), retActors)
 
 class PTestActor(CTestActor):
     def IntIn(self, i:int, ints:[int], f:float):
@@ -177,6 +201,32 @@ class PTestActor(CTestActor):
         tr.Note('StringInOutRet', 'send', sretargs(ret))
         return ret
 
+    def ActorIn(self, i:int, actors:[ParamActor], f:float):
+        tr.Note('ActorIn', 'recv', sargs(i, actors, f))
+        tr.Note('ActorIn', 'send', 'None')
+
+    def ActorOut(self, i:int) -> ([ParamActor], float):
+        tr.Note('ActorOut', 'recv', sargs(i))
+        P = ParamActorWithName
+        ret = [P(x) for x in 'Joseph Hyrum Alvin'.split()], 254.061
+        tr.Note('ActorOut', 'send', sretargs(ret))
+        return ret
+
+    def ActorRet(self, i:int) -> [ParamActor]:
+        tr.Note('ActorRet', 'recv', sargs(i))
+        P = ParamActorWithName
+        ret = [P(x) for x in 'Luke Han Leia Lando Bobba'.split()]
+        tr.Note('ActorRet', 'send', sretargs(ret))
+        return ret
+
+    def ActorInOutRet(self, i:int, inActors:[ParamActor]) -> ([ParamActor], float, [ParamActor]):
+        tr.Note('ActorInOutRet', 'recv', sargs(i, inActors))
+        P = ParamActorWithName
+        out = [P(x) for x in 'Up Down Left Right'.split()]
+        ret = [P(x) for x in 'North South East wEsT'.split()]
+        ret = out, 98.715, ret
+        tr.Note('ActorInOutRet', 'send', sretargs(ret))
+        return ret
 
 EXPECTED = '''
 tester|send|10,[55,57,59,61],3.500
@@ -259,6 +309,25 @@ StringInOutRet|recv|73716,["One","Two","Three","Four","Five","Six"]
 StringInOutRet|send|["Origin","Rebates","Foreseen","Abner"],77.115,["Battery","Mouse","Pad","Charger","Cord"]
 tester|recv|["Origin","Rebates","Foreseen","Abner"],77.115,["Battery","Mouse","Pad","Charger","Cord"]
 
+tester|send|13,[Actor(Joe),Actor(Fred),Actor(Jared),Actor(Ed)],-689.123
+ActorIn|recv|13,[Actor(Joe),Actor(Fred),Actor(Jared),Actor(Ed)],-689.123
+ActorIn|send|None
+tester|recv|None
+
+tester|send|7455
+ActorOut|recv|7455
+ActorOut|send|[Actor(Joseph),Actor(Hyrum),Actor(Alvin)],254.061
+tester|recv|[Actor(Joseph),Actor(Hyrum),Actor(Alvin)],254.061
+
+tester|send|311111
+ActorRet|recv|311111
+ActorRet|send|[Actor(Luke),Actor(Han),Actor(Leia),Actor(Lando),Actor(Bobba)]
+tester|recv|[Actor(Luke),Actor(Han),Actor(Leia),Actor(Lando),Actor(Bobba)]
+
+tester|send|8675309,[Actor(Larry),Actor(Curly),Actor(Moe)]
+ActorInOutRet|recv|8675309,[Actor(Larry),Actor(Curly),Actor(Moe)]
+ActorInOutRet|send|[Actor(Up),Actor(Down),Actor(Left),Actor(Right)],98.715,[Actor(North),Actor(South),Actor(East),Actor(wEsT)]
+tester|recv|[Actor(Up),Actor(Down),Actor(Left),Actor(Right)],98.715,[Actor(North),Actor(South),Actor(East),Actor(wEsT)]
 '''
 
 def Debug(title, testerClass, actorClass):

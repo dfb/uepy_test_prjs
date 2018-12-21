@@ -85,6 +85,23 @@ def MakeArray(graph, values, pos=None):
         w.Array.sub_category = sub
     return w
 
+def MakeConnectedArray(graph, category, subcategory, pins, pos=None):
+    '''like MakeArray, but instead of literals, it connects the pins to the given inputs'''
+    if pos is None:
+        pos = graph.graph_get_good_place_for_new_node()
+    node = graph.graph_add_node(K2Node_MakeArray, *pos)
+    node.NumInputs = len(pins)
+    node.node_reconstruct()
+    for i, otherPin in enumerate(pins):
+        pin = node.node_find_pin('[%d]' % i)
+        pin.category = category
+        pin.sub_category = subcategory
+        pin.make_link_to(otherPin)
+    node = NodeWrapper(node)
+    node.Array.category = category
+    node.Array.sub_category = subcategory
+    return node
+
 def MakeLiteral(graph, value, pos=None):
     if pos is None:
         pos = graph.graph_get_good_place_for_new_node()
@@ -158,7 +175,214 @@ def GetReturnNode(graph):
     assert 0, 'No return node found'
 
 Utils = FindBP('/Game/Utils.Utils').GeneratedClass
-from unreal_engine.classes import TestRecorder, TestActor
+from unreal_engine.classes import TestRecorder, TestActor, ParamActor
+
+if 1:
+    # ActorInOutRet
+    bp = FindBP('/Game/BTestActor.BTestActor')
+    graph = GetFunctionGraph(bp, 'ActorInOutRet')
+    entry = NodeWrapper(graph.Nodes[0])
+    argsStr = MakeArgsStr(graph, (entry.i, Utils.StrInt), (entry.inActors, Utils.StrActorArray))
+    recvNote = TestRecorderNote(graph, 'ActorInOutRet', 'recv', argsStr.ReturnValue, entry.then)
+    prevLink = recvNote.then
+    actors = []
+    for name in 'Up Down Left Right'.split():
+        spawn = MakeCall(graph, ParamActor.SpawnWithName)
+        spawn.withName = name
+        spawn.execute = prevLink
+        prevLink = spawn.then
+        actors.append(spawn.ReturnValue)
+    outArray = MakeConnectedArray(graph, 'object', ParamActor, actors)
+    outF = MakeLiteral(graph, 98.715)
+    actors = []
+    for name in 'North South East wEsT'.split():
+        spawn = MakeCall(graph, ParamActor.SpawnWithName)
+        spawn.withName = name
+        spawn.execute = prevLink
+        prevLink = spawn.then
+        actors.append(spawn.ReturnValue)
+    retArray = MakeConnectedArray(graph, 'object', ParamActor, actors)
+    argsStr = MakeArgsStr(graph, (outArray.Array, Utils.StrActorArray), (outF.ReturnValue, Utils.StrFloat), (retArray.Array, Utils.StrActorArray))
+    sendNote = TestRecorderNote(graph, 'ActorInOutRet', 'send', argsStr.ReturnValue, prevLink)
+    ret = GetReturnNode(graph)
+    ret.execute = sendNote.then
+    ret.outActors = outArray.Array
+    ret.of = outF.ReturnValue
+    ret.ReturnValue = retArray.Array
+
+if 0:
+    # TestActorInOutRet
+    bp = FindBP('/Game/BTester.BTester')
+    graph = ue.blueprint_add_function(bp, 'TestActorInOutRet')
+    entry = NodeWrapper(graph.Nodes[0])
+    prevLink = entry.then
+    i = MakeLiteral(graph, 8675309)
+    actors = []
+    for name in 'Larry Curly Moe'.split():
+        spawn = MakeCall(graph, ParamActor.SpawnWithName)
+        spawn.withName = name
+        spawn.execute = prevLink
+        prevLink = spawn.then
+        actors.append(spawn.ReturnValue)
+    array = MakeConnectedArray(graph, 'object', ParamActor, actors)
+    argsStr = MakeArgsStr(graph, (i.ReturnValue, Utils.StrInt), (array.Array, Utils.StrActorArray))
+    sendNote = TestRecorderNote(graph, 'tester', 'send', argsStr.ReturnValue, prevLink)
+    ta = GetVariable(graph, 'TestActor')
+    taCall = MakeCall(graph, TestActor.ActorInOutRet)
+    taCall.self = ta.TestActor
+    taCall.i = i.ReturnValue
+    taCall.inActors = array.Array
+    taCall.execute = sendNote.then
+    argsStr = MakeArgsStr(graph, (taCall.outActors, Utils.StrActorArray), (taCall.of, Utils.StrFloat), (taCall.ReturnValue, Utils.StrActorArray))
+    recvNote = TestRecorderNote(graph, 'tester', 'recv', argsStr.ReturnValue, taCall.then)
+    destroy = MakeCall(graph, ParamActor.DestroyActors)
+    destroy.execute = recvNote.then
+    destroy.actors = array.Array
+    d2 = MakeCall(graph, ParamActor.DestroyActors)
+    d2.execute = destroy.then
+    d2.actors = taCall.outActors
+    d3 = MakeCall(graph, ParamActor.DestroyActors)
+    d3.execute = d2.then
+    d3.actors = taCall.ReturnValue
+
+if 0:
+    # ActorRet
+    bp = FindBP('/Game/BTestActor.BTestActor')
+    graph = GetFunctionGraph(bp, 'ActorRet')
+    entry = NodeWrapper(graph.Nodes[0])
+    argsStr = MakeArgsStr(graph, (entry.i, Utils.StrInt))
+    recvNote = TestRecorderNote(graph, 'ActorRet', 'recv', argsStr.ReturnValue, entry.then)
+    prevLink = recvNote.then
+    actors = []
+    for name in 'Luke Han Leia Lando Bobba'.split():
+        spawn = MakeCall(graph, ParamActor.SpawnWithName)
+        spawn.withName = name
+        spawn.execute = prevLink
+        prevLink = spawn.then
+        actors.append(spawn.ReturnValue)
+    array = MakeConnectedArray(graph, 'object', ParamActor, actors)
+    argsStr = MakeArgsStr(graph, (array.Array, Utils.StrActorArray))
+    sendNote = TestRecorderNote(graph, 'ActorRet', 'send', argsStr.ReturnValue, prevLink)
+    ret = GetReturnNode(graph)
+    ret.execute = sendNote.then
+    ret.ReturnValue = array.Array
+
+if 0:
+    # TestActorRet
+    bp = FindBP('/Game/BTester.BTester')
+    try:
+        GetFunctionGraph(bp, 'TestActorRet')
+        raise Exception('Delete function first!')
+    except AssertionError:
+        pass
+    graph = ue.blueprint_add_function(bp, 'TestActorRet')
+    entry = graph.Nodes[0]
+    i = MakeLiteral(graph, 311111)
+    argsStr = MakeArgsStr(graph, (i.ReturnValue, Utils.StrInt))
+    preNote = TestRecorderNote(graph, 'tester', 'send', argsStr.ReturnValue, entry.node_find_pin('then'))
+    ta = GetVariable(graph, 'TestActor')
+    taCall = MakeCall(graph, TestActor.ActorRet)
+    taCall.self = ta.TestActor
+    taCall.i = i.ReturnValue
+    taCall.execute = preNote.then
+    argsStr = MakeArgsStr(graph, (taCall.ReturnValue, Utils.StrActorArray))
+    recvNote = TestRecorderNote(graph, 'tester', 'recv', argsStr.ReturnValue, taCall.then)
+    destroy = MakeCall(graph, ParamActor.DestroyActors)
+    destroy.execute = recvNote.then
+    destroy.actors = taCall.ReturnValue
+
+if 0:
+    # ActorOut
+    bp = FindBP('/Game/BTestActor.BTestActor')
+    graph = GetFunctionGraph(bp, 'ActorOut')
+    entry = NodeWrapper(graph.Nodes[0])
+    argsStr = MakeArgsStr(graph, (entry.i, Utils.StrInt))
+    recvNote = TestRecorderNote(graph, 'ActorOut', 'recv', argsStr.ReturnValue, entry.then)
+    prevLink = recvNote.then
+    actors = []
+    for name in 'Joseph Hyrum Alvin'.split():
+        spawn = MakeCall(graph, ParamActor.SpawnWithName)
+        spawn.withName = name
+        spawn.execute = prevLink
+        prevLink = spawn.then
+        actors.append(spawn.ReturnValue)
+    array = MakeConnectedArray(graph, 'object', ParamActor, actors)
+    of = MakeLiteral(graph, 254.061)
+    argsStr = MakeArgsStr(graph, (array.Array, Utils.StrActorArray), (of.ReturnValue, Utils.StrFloat))
+    sendNote = TestRecorderNote(graph, 'ActorOut', 'send', argsStr.ReturnValue, prevLink)
+    ret = GetReturnNode(graph)
+    ret.execute = sendNote.then
+    ret.actors = array.Array
+    ret.of = of.ReturnValue
+
+if 0:
+    # TestActorOut
+    bp = FindBP('/Game/BTester.BTester')
+    try:
+        GetFunctionGraph(bp, 'TestActorOut')
+        raise Exception('Delete function first!')
+    except AssertionError:
+        pass
+    graph = ue.blueprint_add_function(bp, 'TestActorOut')
+    entry = graph.Nodes[0]
+    i = MakeLiteral(graph, 7455)
+    argsStr = MakeArgsStr(graph, (i.ReturnValue, Utils.StrInt))
+    preNote = TestRecorderNote(graph, 'tester', 'send', argsStr.ReturnValue, entry.node_find_pin('then'))
+    ta = GetVariable(graph, 'TestActor')
+    taCall = MakeCall(graph, TestActor.ActorOut)
+    taCall.self = ta.TestActor
+    taCall.i = i.ReturnValue
+    taCall.execute = preNote.then
+    argsStr = MakeArgsStr(graph, (taCall.actors, Utils.StrActorArray), (taCall.of, Utils.StrFloat))
+    recvNote = TestRecorderNote(graph, 'tester', 'recv', argsStr.ReturnValue, taCall.then)
+    destroy = MakeCall(graph, ParamActor.DestroyActors)
+    destroy.execute = recvNote.then
+    destroy.actors = taCall.actors
+
+if 0:
+    # ActorIn
+    bp = FindBP('/Game/BTestActor.BTestActor')
+    graph = bp.UberGraphPages[0]
+    entry = GetEventNode(bp, 'ActorIn')
+    argsStr = MakeArgsStr(graph, (entry.i, Utils.StrInt), (entry.actors, Utils.StrActorArray), (entry.f, Utils.StrFloat))
+    recvNote = TestRecorderNote(graph, 'ActorIn', 'recv', argsStr.ReturnValue, entry.then)
+    sendNote = TestRecorderNote(graph, 'ActorIn', 'send', 'None', recvNote.then)
+
+if 0:
+    # TestActorIn
+    bp = FindBP('/Game/BTester.BTester')
+    try:
+        GetFunctionGraph(bp, 'TestActorIn')
+        raise Exception('Delete function first!')
+    except AssertionError:
+        pass
+    graph = ue.blueprint_add_function(bp, 'TestActorIn')
+    entry = NodeWrapper(graph.Nodes[0])
+    prevLink = entry.then
+    actors = []
+    for name in 'Joe Fred Jared Ed'.split():
+        spawn = MakeCall(graph, ParamActor.SpawnWithName)
+        spawn.withName = name
+        spawn.execute = prevLink
+        prevLink = spawn.then
+        actors.append(spawn.ReturnValue)
+
+    i = MakeLiteral(graph, 13)
+    array = MakeConnectedArray(graph, 'object', ParamActor, actors)
+    f = MakeLiteral(graph, -689.123)
+    argsStr = MakeArgsStr(graph, (i.ReturnValue, Utils.StrInt), (array.Array, Utils.StrActorArray), (f.ReturnValue, Utils.StrFloat))
+    preNote = TestRecorderNote(graph, 'tester', 'send', argsStr.ReturnValue, prevLink)
+    ta = GetVariable(graph, 'TestActor')
+    taCall = MakeCall(graph, TestActor.ActorIn)
+    taCall.self = ta.TestActor
+    taCall.i = i.ReturnValue
+    taCall.actors = array.Array
+    taCall.f = f.ReturnValue
+    taCall.execute = preNote.then
+    recvNote = TestRecorderNote(graph, 'tester', 'recv', 'None', taCall.then)
+    destroy = MakeCall(graph, ParamActor.DestroyActors)
+    destroy.execute = recvNote.then
+    destroy.actors = array.Array
 
 if 0:
     # StringInOutRet

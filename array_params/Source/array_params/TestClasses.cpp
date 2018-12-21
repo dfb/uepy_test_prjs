@@ -6,11 +6,45 @@ DECLARE_LOG_CATEGORY_EXTERN(ARRAY_PARAMS, Log, All);
 
 DEFINE_LOG_CATEGORY(ARRAY_PARAMS);
 
+// TODO: now that we have a pattern, templatize this mess
+
 void ATestRecorder::Note(FString who, FString action, FString args)
 {
     FString line = FString::Printf(_T("%s|%s|%s"), *who, *action, *args);
     lines.Emplace(line);
     //LOG("%s", *line);
+}
+
+AParamActor *AParamActor::SpawnWithName(UObject *WorldContextObject, FString withName)
+{
+    FVector loc;
+    UWorld* world = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull);
+    FActorSpawnParameters spawnParams;
+    spawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    AParamActor *actor = (AParamActor*)world->SpawnActor(AParamActor::StaticClass(), &loc, nullptr, spawnParams);
+    actor->SetTestName(withName);
+    return actor;
+}
+
+void AParamActor::DestroyActors(UObject *WorldContextObject, const TArray<AParamActor*>& actors)
+{
+    UWorld* world = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull);
+    for (auto actor : actors)
+        world->DestroyActor(actor);
+}
+
+FString Str(const AParamActor *a)
+{
+    FString name = a->GetTestName();
+    return FString::Printf(_T("Actor(%s)"), *name);
+}
+
+FString Str(const TArray<AParamActor*>& params)
+{
+    TArray<FString> parts;
+    for (auto& p : params)
+        parts.Emplace(Str(p));
+    return FString::Printf(_T("[%s]"), *FString::Join(parts, _T(",")));
 }
 
 FString Str(const FString s)
@@ -239,23 +273,57 @@ TArray<FString> ATestActor::StringInOutRet_Implementation(int i, const TArray<FS
     return ret;
 }
 
-void ATestActor::ActorIn_Implementation(int i, const TArray<AActor*>& actors, float f)
+void ATestActor::ActorIn_Implementation(int i, const TArray<AParamActor*>& inputs, float f)
 {
+    FString args = FString::Printf(_T("%d,%s,%.3f"), i, *Str(inputs), f);
+    recorder->Note(_T("ActorIn"), _T("recv"), *args);
+    recorder->Note(_T("ActorIn"), _T("send"), _T("None"));
 }
 
-void ATestActor::ActorOut_Implementation(int i, TArray<AActor*>& actors, float& of)
+void ATestActor::ActorOut_Implementation(int i, TArray<AParamActor*>& outputs, float& of)
 {
+    FString args = FString::Printf(_T("%d"), i);
+    recorder->Note(_T("ActorOut"), _T("recv"), *args);
+    outputs.Empty();
+    outputs.Emplace(AParamActor::SpawnWithName(GetWorld(), _T("Joseph")));
+    outputs.Emplace(AParamActor::SpawnWithName(GetWorld(), _T("Hyrum")));
+    outputs.Emplace(AParamActor::SpawnWithName(GetWorld(), _T("Alvin")));
+    of = 254.061;
+    args = FString::Printf(_T("%s,%.3f"), *Str(outputs), of);
+    recorder->Note(_T("ActorOut"), _T("send"), *args);
 }
 
-TArray<AActor*> ATestActor::ActorRet_Implementation(int i)
+TArray<AParamActor*> ATestActor::ActorRet_Implementation(int i)
 {
-    TArray<AActor *> ret;
+    FString args = FString::Printf(_T("%d"), i);
+    recorder->Note(_T("ActorRet"), _T("recv"), *args);
+    TArray<AParamActor*> ret;
+    ret.Emplace(AParamActor::SpawnWithName(GetWorld(), _T("Luke")));
+    ret.Emplace(AParamActor::SpawnWithName(GetWorld(), _T("Han")));
+    ret.Emplace(AParamActor::SpawnWithName(GetWorld(), _T("Leia")));
+    ret.Emplace(AParamActor::SpawnWithName(GetWorld(), _T("Lando")));
+    ret.Emplace(AParamActor::SpawnWithName(GetWorld(), _T("Bobba")));
+    recorder->Note(_T("ActorRet"), _T("send"), *Str(ret));
     return ret;
 }
 
-TArray<AActor*> ATestActor::ActorInOutRet_Implementation(int i, const TArray<AActor*>& inActors, TArray<AActor*>& outActors, float& of)
+TArray<AParamActor*> ATestActor::ActorInOutRet_Implementation(int i, const TArray<AParamActor*>& inParam, TArray<AParamActor*>& outParam, float& of)
 {
-    TArray<AActor *> ret;
+    FString args = FString::Printf(_T("%d,%s"), i, *Str(inParam));
+    recorder->Note(_T("ActorInOutRet"), _T("recv"), *args);
+    of = 98.715;
+    outParam.Empty();
+    outParam.Emplace(AParamActor::SpawnWithName(GetWorld(), _T("Up")));
+    outParam.Emplace(AParamActor::SpawnWithName(GetWorld(), _T("Down")));
+    outParam.Emplace(AParamActor::SpawnWithName(GetWorld(), _T("Left")));
+    outParam.Emplace(AParamActor::SpawnWithName(GetWorld(), _T("Right")));
+    TArray<AParamActor*> ret;
+    ret.Emplace(AParamActor::SpawnWithName(GetWorld(), _T("North")));
+    ret.Emplace(AParamActor::SpawnWithName(GetWorld(), _T("South")));
+    ret.Emplace(AParamActor::SpawnWithName(GetWorld(), _T("East")));
+    ret.Emplace(AParamActor::SpawnWithName(GetWorld(), _T("wEsT")));
+    args = FString::Printf(_T("%s,%.3f,%s"), *Str(outParam), of, *Str(ret));
+    recorder->Note(_T("ActorInOutRet"), _T("send"), *args);
     return ret;
 }
 
@@ -439,6 +507,58 @@ void ATester::RunTests(ATestRecorder *recorder, ATestActor *callee)
         retParam = callee->StringInOutRet(i, inParam, outParam, of);
         args = FString::Printf(_T("%s,%.3f,%s"), *Str(outParam), of, *Str(retParam));
         recorder->Note(_T("tester"), _T("recv"), args);
+    }
+
+    // actor
+    {
+        int i = 13;
+        TArray<AParamActor *> inParam;
+        inParam.Emplace(AParamActor::SpawnWithName(GetWorld(), _T("Joe")));
+        inParam.Emplace(AParamActor::SpawnWithName(GetWorld(), _T("Fred")));
+        inParam.Emplace(AParamActor::SpawnWithName(GetWorld(), _T("Jared")));
+        inParam.Emplace(AParamActor::SpawnWithName(GetWorld(), _T("Ed")));
+        float f = -689.123;
+        FString args = FString::Printf(_T("%d,%s,%.3f"), i, *Str(inParam), f);
+        recorder->Note(_T("tester"), _T("send"), *args);
+        callee->ActorIn(i, inParam, f);
+        recorder->Note(_T("tester"), _T("recv"), _T("None"));
+        AParamActor::DestroyActors(GetWorld(), inParam);
+    }
+    {
+        int i = 7455;
+        TArray<AParamActor*> outParam;
+        float f;
+        FString args = FString::Printf(_T("%d"), i);
+        recorder->Note(_T("tester"), _T("send"), args);
+        callee->ActorOut(i, outParam, f);
+        args = FString::Printf(_T("%s,%.3f"), *Str(outParam), f);
+        recorder->Note(_T("tester"), _T("recv"), args);
+        AParamActor::DestroyActors(GetWorld(), outParam);
+    }
+    {
+        int i = 311111;
+        FString args = FString::Printf(_T("%d"), i);
+        recorder->Note(_T("tester"), _T("send"), args);
+        TArray<AParamActor*> retParam = callee->ActorRet(i);
+        args = FString::Printf(_T("%s"), *Str(retParam));
+        recorder->Note(_T("tester"), _T("recv"), args);
+    }
+    {
+        int i = 8675309;
+        TArray<AParamActor *> inParam;
+        inParam.Emplace(AParamActor::SpawnWithName(GetWorld(), _T("Larry")));
+        inParam.Emplace(AParamActor::SpawnWithName(GetWorld(), _T("Curly")));
+        inParam.Emplace(AParamActor::SpawnWithName(GetWorld(), _T("Moe")));
+        FString args = FString::Printf(_T("%d,%s"), i, *Str(inParam));
+        recorder->Note(_T("tester"), _T("send"), args);
+        float of = 0.0f;
+        TArray<AParamActor *> retParam, outParam;
+        retParam = callee->ActorInOutRet(i, inParam, outParam, of);
+        args = FString::Printf(_T("%s,%.3f,%s"), *Str(outParam), of, *Str(retParam));
+        recorder->Note(_T("tester"), _T("recv"), args);
+        AParamActor::DestroyActors(GetWorld(), inParam);
+        AParamActor::DestroyActors(GetWorld(), outParam);
+        AParamActor::DestroyActors(GetWorld(), retParam);
     }
 }
 
