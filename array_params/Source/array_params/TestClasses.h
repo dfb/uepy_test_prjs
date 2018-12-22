@@ -27,6 +27,7 @@ struct FTestStruct
     GENERATED_BODY();
     UPROPERTY(BlueprintReadWrite, EditAnywhere) FString name;
     UPROPERTY(BlueprintReadWrite, EditAnywhere) int number;
+    FTestStruct() {}
 };
 
 // this actor is used in the UObject parameter tests

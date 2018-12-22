@@ -20,6 +20,7 @@ AParamActor *AParamActor::SpawnWithName(UObject *WorldContextObject, FString wit
     FVector loc;
     UWorld* world = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull);
     FActorSpawnParameters spawnParams;
+	spawnParams.bNoFail = true;
     spawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     AParamActor *actor = (AParamActor*)world->SpawnActor(AParamActor::StaticClass(), &loc, nullptr, spawnParams);
     actor->SetTestName(withName);
@@ -31,6 +32,19 @@ void AParamActor::DestroyActors(UObject *WorldContextObject, const TArray<AParam
     UWorld* world = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull);
     for (auto actor : actors)
         world->DestroyActor(actor);
+}
+
+FString Str(const FTestStruct& s)
+{
+    return FString::Printf(_T("TS(%s,%d)"), *s.name, s.number);
+}
+
+FString Str(const TArray<FTestStruct>& params)
+{
+    TArray<FString> parts;
+    for (auto& p : params)
+        parts.Emplace(Str(p));
+    return FString::Printf(_T("[%s]"), *FString::Join(parts, _T(",")));
 }
 
 FString Str(const AParamActor *a)
@@ -327,30 +341,67 @@ TArray<AParamActor*> ATestActor::ActorInOutRet_Implementation(int i, const TArra
     return ret;
 }
 
-void ATestActor::StructIn_Implementation(int i, const TArray<FTestStruct>& structs, float f)
+void ATestActor::StructIn_Implementation(int i, const TArray<FTestStruct>& inputs, float f)
 {
+    FString args = FString::Printf(_T("%d,%s,%.3f"), i, *Str(inputs), f);
+    recorder->Note(_T("StructIn"), _T("recv"), *args);
+    recorder->Note(_T("StructIn"), _T("send"), _T("None"));
 }
 
-void ATestActor::StructOut_Implementation(int i, TArray<FTestStruct>& structs, float& of)
+void ATestActor::StructOut_Implementation(int i, TArray<FTestStruct>& outputs, float& of)
 {
+    FString args = FString::Printf(_T("%d"), i);
+    recorder->Note(_T("StructOut"), _T("recv"), *args);
+    outputs.Empty();
+    TArray<FTestStruct> inParam;
+    FTestStruct ts;
+    ts.name = _T("Monday"); ts.number = 5; outputs.Emplace(ts);
+    ts.name = _T("toozdee"); ts.number = 10; outputs.Emplace(ts);
+    ts.name = _T("Wed"); ts.number = 15; outputs.Emplace(ts);
+    ts.name = _T("Thirsty"); ts.number = 20; outputs.Emplace(ts);
+    of = 9.895;
+    args = FString::Printf(_T("%s,%.3f"), *Str(outputs), of);
+    recorder->Note(_T("StructOut"), _T("send"), *args);
 }
 
 TArray<FTestStruct> ATestActor::StructRet_Implementation(int i)
 {
+    FString args = FString::Printf(_T("%d"), i);
+    recorder->Note(_T("StructRet"), _T("recv"), *args);
     TArray<FTestStruct> ret;
+    FTestStruct ts;
+    ts.name = _T("Red"); ts.number = 101; ret.Emplace(ts);
+    ts.name = _T("Blue"); ts.number = 102; ret.Emplace(ts);
+    ts.name = _T("Green"); ts.number = 103; ret.Emplace(ts);
+    ts.name = _T("Orange"); ts.number = 104; ret.Emplace(ts);
+    recorder->Note(_T("StructRet"), _T("send"), *Str(ret));
     return ret;
 }
 
-TArray<FTestStruct> ATestActor::StructInOutRet_Implementation(int i, const TArray<FTestStruct>& inStructs, TArray<FTestStruct>& outStructs, float& of)
+TArray<FTestStruct> ATestActor::StructInOutRet_Implementation(int i, const TArray<FTestStruct>& inParam, TArray<FTestStruct>& outParam, float& of)
 {
+    FString args = FString::Printf(_T("%d,%s"), i, *Str(inParam));
+    recorder->Note(_T("StructInOutRet"), _T("recv"), *args);
+    of = 101.125;
+    outParam.Empty();
+    FTestStruct ts;
+    ts.name = _T("Spring"); ts.number = 5001; outParam.Emplace(ts);
+    ts.name = _T("Summer"); ts.number = -5002; outParam.Emplace(ts);
+    ts.name = _T("Fall"); ts.number = 5003; outParam.Emplace(ts);
+    ts.name = _T("Winter"); ts.number = -5004; outParam.Emplace(ts);
     TArray<FTestStruct> ret;
+    ts.name = _T("Brighton"); ts.number = 16; ret.Emplace(ts);
+    ts.name = _T("Alta"); ts.number = 18; ret.Emplace(ts);
+    ts.name = _T("Solitude"); ts.number = 20; ret.Emplace(ts);
+    args = FString::Printf(_T("%s,%.3f,%s"), *Str(outParam), of, *Str(ret));
+    recorder->Note(_T("StructInOutRet"), _T("send"), *args);
     return ret;
 }
 
 
 void ATester::RunDebugTest(ATestRecorder *recorder, ATestActor *callee)
 {
-
+    LOG("WTH??");
 }
 
 void ATester::RunTests(ATestRecorder *recorder, ATestActor *callee)
@@ -542,6 +593,7 @@ void ATester::RunTests(ATestRecorder *recorder, ATestActor *callee)
         TArray<AParamActor*> retParam = callee->ActorRet(i);
         args = FString::Printf(_T("%s"), *Str(retParam));
         recorder->Note(_T("tester"), _T("recv"), args);
+        AParamActor::DestroyActors(GetWorld(), retParam);
     }
     {
         int i = 8675309;
@@ -559,6 +611,55 @@ void ATester::RunTests(ATestRecorder *recorder, ATestActor *callee)
         AParamActor::DestroyActors(GetWorld(), inParam);
         AParamActor::DestroyActors(GetWorld(), outParam);
         AParamActor::DestroyActors(GetWorld(), retParam);
+    }
+
+    // struct
+    {
+        int i = 1887;
+        TArray<FTestStruct> inParam;
+        FTestStruct ts;
+        ts.name = _T("Fingers"); ts.number = 10; inParam.Emplace(ts);
+        ts.name = _T("Toes"); ts.number = 11; inParam.Emplace(ts);
+        ts.name = _T("knees"); ts.number = 12; inParam.Emplace(ts);
+        ts.name = _T("elboWS"); ts.number = 99; inParam.Emplace(ts);
+        float f = -271.122;
+        FString args = FString::Printf(_T("%d,%s,%.3f"), i, *Str(inParam), f);
+        recorder->Note(_T("tester"), _T("send"), *args);
+        callee->StructIn(i, inParam, f);
+        recorder->Note(_T("tester"), _T("recv"), _T("None"));
+    }
+    {
+        int i = 1234567;
+        TArray<FTestStruct> outParam;
+        float f;
+        FString args = FString::Printf(_T("%d"), i);
+        recorder->Note(_T("tester"), _T("send"), args);
+        callee->StructOut(i, outParam, f);
+        args = FString::Printf(_T("%s,%.3f"), *Str(outParam), f);
+        recorder->Note(_T("tester"), _T("recv"), args);
+    }
+    {
+        int i = 10242048;
+        FString args = FString::Printf(_T("%d"), i);
+        recorder->Note(_T("tester"), _T("send"), args);
+        TArray<FTestStruct> retParam = callee->StructRet(i);
+        args = FString::Printf(_T("%s"), *Str(retParam));
+        recorder->Note(_T("tester"), _T("recv"), args);
+    }
+    {
+        int i = 6357;
+        TArray<FTestStruct> inParam;
+        FTestStruct ts;
+        ts.name = _T("Dell"); ts.number = 107; inParam.Emplace(ts);
+        ts.name = _T("HP"); ts.number = 1000; inParam.Emplace(ts);
+        ts.name = _T("Razor"); ts.number = 201; inParam.Emplace(ts);
+        FString args = FString::Printf(_T("%d,%s"), i, *Str(inParam));
+        recorder->Note(_T("tester"), _T("send"), args);
+        float of = 0.0f;
+        TArray<FTestStruct> retParam, outParam;
+        retParam = callee->StructInOutRet(i, inParam, outParam, of);
+        args = FString::Printf(_T("%s,%.3f,%s"), *Str(outParam), of, *Str(retParam));
+        recorder->Note(_T("tester"), _T("recv"), args);
     }
 }
 

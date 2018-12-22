@@ -16,7 +16,7 @@ NEXT:
 
 from helpers import *
 from unreal_engine.classes import BlueprintGeneratedClass, Blueprint, Class, Class, Actor, TestRecorder, StrProperty
-from unreal_engine import UObject
+from unreal_engine import UObject, UScriptStruct
 import difflib
 from typing import List
 ue.allow_actor_script_execution_in_editor(True)
@@ -31,6 +31,7 @@ def sarg(arg):
     if type(arg) is bool: return str(int(arg))
     if type(arg) is FVector: return 'Vec(%.3f,%.3f,%.3f)' % (arg.x, arg.y, arg.z)
     if type(arg) is UObject and arg.is_a(ParamActor): return 'Actor(%s)' % arg.GetTestName()
+    if type(arg) is UScriptStruct and arg.get_struct() is TestStruct: return 'TS(%s,%d)' % (arg.name, arg.number)
     assert 0, (type(arg), arg)
 
 def sargs(*args):
@@ -70,6 +71,7 @@ BTester = ue.load_object(Blueprint, '/Game/BTester.BTester').GeneratedClass
 CTestActor = ue.load_object(Class, '/Script/array_params.TestActor')
 BTestActor = ue.load_object(Blueprint, '/Game/BTestActor.BTestActor').GeneratedClass
 ParamActor = ue.load_object(Class, '/Script/array_params.ParamActor')
+from unreal_engine.structs import TestStruct
 
 def ParamActorWithName(name):
     return ParamActor.SpawnWithName(GetWorld(), name)
@@ -112,6 +114,16 @@ class PTester(CTester):
         ParamActor.DestroyActors(GetWorld(), actors)
         ParamActor.DestroyActors(GetWorld(), outActors)
         ParamActor.DestroyActors(GetWorld(), retActors)
+
+        TS = TestStruct
+        PCall('tester', callee, 'StructIn', 1887, [TS(name='Fingers', number=10), TS(name='Toes', number=11), TS(name='knees', number=12), TS(name='elboWS', number=99)], -271.122)
+        PCall('tester', callee, 'StructOut', 1234567)
+        PCall('tester', callee, 'StructRet', 10242048)
+        PCall('tester', callee, 'StructInOutRet', 6357, [TS(name='Dell',number=107), TS(name='HP',number=1000), TS(name='Razor', number=201)])
+
+    def RunDebugTest(self, rec:TestRecorder, callee:CTestActor):
+        PCall('tester', callee, 'StructOut', 1234567)
+
 
 class PTestActor(CTestActor):
     def IntIn(self, i:int, ints:[int], f:float):
@@ -228,6 +240,34 @@ class PTestActor(CTestActor):
         tr.Note('ActorInOutRet', 'send', sretargs(ret))
         return ret
 
+    def StructIn(self, i:int, structs:[TestStruct], f:float):
+        tr.Note('StructIn', 'recv', sargs(i, structs, f))
+        tr.Note('StructIn', 'send', 'None')
+
+    def StructOut(self, i:int) -> ([TestStruct], float):
+        tr.Note('StructOut', 'recv', sargs(i))
+        TS = TestStruct
+        ret = [TS(name='Monday', number=5), TS(name='toozdee', number=10), TS(name='Wed', number=15), TS(name='Thirsty', number=20)], 9.895
+        tr.Note('StructOut', 'send', sretargs(ret))
+        return ret
+
+    def StructRet(self, i:int) -> [TestStruct]:
+        tr.Note('StructRet', 'recv', sargs(i))
+        TS = TestStruct
+        ret = [TS(name='Red',number=101),TS(name='Blue',number=102),TS(name='Green',number=103),TS(name='Orange',number=104)]
+        tr.Note('StructRet', 'send', sretargs(ret))
+        return ret
+
+    def StructInOutRet(self, i:int, inStructs:[TestStruct]) -> ([TestStruct], float, [TestStruct]):
+        tr.Note('StructInOutRet', 'recv', sargs(i, inStructs))
+        TS = TestStruct
+        ret = [TS(name='Spring',number=5001),TS(name='Summer',number=-5002),TS(name='Fall',number=5003),TS(name='Winter',number=-5004)], \
+                101.125, \
+                [TS(name='Brighton',number=16), TS(name='Alta',number=18), TS(name='Solitude',number=20)]
+        tr.Note('StructInOutRet', 'send', sretargs(ret))
+        return ret
+
+
 EXPECTED = '''
 tester|send|10,[55,57,59,61],3.500
 IntIn|recv|10,[55,57,59,61],3.500
@@ -289,6 +329,7 @@ VectorInOutRet|recv|99411,[Vec(10.000,11.000,12.000),Vec(13.000,14.000,15.000),V
 VectorInOutRet|send|[Vec(1.111,2.222,3.333),Vec(4.444,5.555,6.666)],1151.966,[Vec(100.000,200.000,300.000),Vec(400.000,500.000,600.000),Vec(10.000,20.000,30.000),Vec(40.000,50.000,60.000)]
 tester|recv|[Vec(1.111,2.222,3.333),Vec(4.444,5.555,6.666)],1151.966,[Vec(100.000,200.000,300.000),Vec(400.000,500.000,600.000),Vec(10.000,20.000,30.000),Vec(40.000,50.000,60.000)]
 
+
 tester|send|786,["Rachael","Jacob","Nathan","Adam"],3.142
 StringIn|recv|786,["Rachael","Jacob","Nathan","Adam"],3.142
 StringIn|send|None
@@ -309,6 +350,7 @@ StringInOutRet|recv|73716,["One","Two","Three","Four","Five","Six"]
 StringInOutRet|send|["Origin","Rebates","Foreseen","Abner"],77.115,["Battery","Mouse","Pad","Charger","Cord"]
 tester|recv|["Origin","Rebates","Foreseen","Abner"],77.115,["Battery","Mouse","Pad","Charger","Cord"]
 
+
 tester|send|13,[Actor(Joe),Actor(Fred),Actor(Jared),Actor(Ed)],-689.123
 ActorIn|recv|13,[Actor(Joe),Actor(Fred),Actor(Jared),Actor(Ed)],-689.123
 ActorIn|send|None
@@ -328,6 +370,28 @@ tester|send|8675309,[Actor(Larry),Actor(Curly),Actor(Moe)]
 ActorInOutRet|recv|8675309,[Actor(Larry),Actor(Curly),Actor(Moe)]
 ActorInOutRet|send|[Actor(Up),Actor(Down),Actor(Left),Actor(Right)],98.715,[Actor(North),Actor(South),Actor(East),Actor(wEsT)]
 tester|recv|[Actor(Up),Actor(Down),Actor(Left),Actor(Right)],98.715,[Actor(North),Actor(South),Actor(East),Actor(wEsT)]
+
+
+tester|send|1887,[TS(Fingers,10),TS(Toes,11),TS(knees,12),TS(elboWS,99)],-271.122
+StructIn|recv|1887,[TS(Fingers,10),TS(Toes,11),TS(knees,12),TS(elboWS,99)],-271.122
+StructIn|send|None
+tester|recv|None
+
+tester|send|1234567
+StructOut|recv|1234567
+StructOut|send|[TS(Monday,5),TS(toozdee,10),TS(Wed,15),TS(Thirsty,20)],9.895
+tester|recv|[TS(Monday,5),TS(toozdee,10),TS(Wed,15),TS(Thirsty,20)],9.895
+
+tester|send|10242048
+StructRet|recv|10242048
+StructRet|send|[TS(Red,101),TS(Blue,102),TS(Green,103),TS(Orange,104)]
+tester|recv|[TS(Red,101),TS(Blue,102),TS(Green,103),TS(Orange,104)]
+
+tester|send|6357,[TS(Dell,107),TS(HP,1000),TS(Razor,201)]
+StructInOutRet|recv|6357,[TS(Dell,107),TS(HP,1000),TS(Razor,201)]
+StructInOutRet|send|[TS(Spring,5001),TS(Summer,-5002),TS(Fall,5003),TS(Winter,-5004)],101.125,[TS(Brighton,16),TS(Alta,18),TS(Solitude,20)]
+tester|recv|[TS(Spring,5001),TS(Summer,-5002),TS(Fall,5003),TS(Winter,-5004)],101.125,[TS(Brighton,16),TS(Alta,18),TS(Solitude,20)]
+
 '''
 
 def Debug(title, testerClass, actorClass):
@@ -357,7 +421,7 @@ def Run(title, testerClass, actorClass):
         actor.DestroyActor()
         tester.DestroyActor()
 
-#Debug('BP calling Py', BTester, PTestActor)
+#Debug('Py calling C++', PTester, CTestActor)
 
 if 1:
     Run('C++ calling C++', CTester, CTestActor)

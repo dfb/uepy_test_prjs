@@ -1,7 +1,7 @@
 from helpers import *
-from unreal_engine.classes import (Blueprint, K2Node_FunctionResult, K2Node_MakeArray as K2Node_MakeArray, K2Node_Event,
+from unreal_engine.classes import (Blueprint, K2Node_FunctionResult, K2Node_MakeArray as K2Node_MakeArray, K2Node_Event, K2Node_MakeStruct,
     KismetSystemLibrary as KSL, KismetTextLibrary as KTL, KismetStringLibrary as KStrLib)
-from unreal_engine import EdGraphPin
+from unreal_engine import EdGraphPin, UObject, UScriptStruct
 
 def FindBP(path, open=False):
     bp = ue.load_object(Blueprint, path)
@@ -174,10 +174,181 @@ def GetReturnNode(graph):
             return NodeWrapper(node)
     assert 0, 'No return node found'
 
+def MakeTestStruct(graph, name, number, pos=None):
+    if pos is None:
+        pos = graph.graph_get_good_place_for_new_node()
+    node = graph.graph_add_node(K2Node_MakeStruct, *pos)
+    node.StructType = TestStruct
+    node.node_reconstruct()
+    node = NodeWrapper(node)
+    node.name = name
+    node.number = number
+    return node
+
 Utils = FindBP('/Game/Utils.Utils').GeneratedClass
 from unreal_engine.classes import TestRecorder, TestActor, ParamActor
+from unreal_engine.structs import TestStruct
 
-if 1:
+if 0:
+    # StructInOutRet
+    bp = FindBP('/Game/BTestActor.BTestActor')
+    graph = GetFunctionGraph(bp, 'StructInOutRet')
+    entry = NodeWrapper(graph.Nodes[0])
+    argsStr = MakeArgsStr(graph, (entry.i, Utils.StrInt), (entry.inStructs, Utils.StrStructArray))
+    recvNote = TestRecorderNote(graph, 'StructInOutRet', 'recv', argsStr.ReturnValue, entry.then)
+    structs = []
+    for name, num in ('Spring',5001), ('Summer',-5002), ('Fall',5003),('Winter',-5004):
+        structs.append(MakeTestStruct(graph, name, num).TestStruct)
+    outArray = MakeConnectedArray(graph, 'struct', TestStruct, structs)
+    outF = MakeLiteral(graph, 101.125)
+    structs = []
+    for name, num in ('Brighton',16),('Alta',18),('Solitude',20):
+        structs.append(MakeTestStruct(graph, name, num).TestStruct)
+    retArray = MakeConnectedArray(graph, 'struct', TestStruct, structs)
+    argsStr = MakeArgsStr(graph, (outArray.Array, Utils.StrStructArray), (outF.ReturnValue, Utils.StrFloat), (retArray.Array, Utils.StrStructArray))
+    sendNote = TestRecorderNote(graph, 'StructInOutRet', 'send', argsStr.ReturnValue, recvNote.then)
+    ret = GetReturnNode(graph)
+    ret.execute = sendNote.then
+    ret.outStructs = outArray.Array
+    ret.of = outF.ReturnValue
+    ret.ReturnValue = retArray.Array
+
+if 0:
+    # TestStructInOutRet
+    bp = FindBP('/Game/BTester.BTester')
+    graph = ue.blueprint_add_function(bp, 'TestStructInOutRet')
+    entry = graph.Nodes[0]
+    i = MakeLiteral(graph, 6357)
+    structs = []
+    for name, num in ('Dell',107), ('HP', 1000), ('Razor', 201):
+        structs.append(MakeTestStruct(graph, name, num).TestStruct)
+    a = MakeConnectedArray(graph, 'struct', TestStruct, structs)
+    argsStr = MakeArgsStr(graph, (i.ReturnValue, Utils.StrInt), (a.Array, Utils.StrStructArray))
+    preNote = TestRecorderNote(graph, 'tester', 'send', argsStr.ReturnValue, entry.node_find_pin('then'))
+    ta = GetVariable(graph, 'TestActor')
+    taCall = MakeCall(graph, TestActor.StructInOutRet)
+    taCall.self = ta.TestActor
+    taCall.i = i.ReturnValue
+    taCall.inStructs = a.Array
+    taCall.execute = preNote.then
+    argsStr = MakeArgsStr(graph, (taCall.outStructs, Utils.StrStructArray), (taCall.of, Utils.StrFloat), (taCall.ReturnValue, Utils.StrStructArray))
+    TestRecorderNote(graph, 'tester', 'recv', argsStr.ReturnValue, taCall.then)
+
+if 0:
+    # StructRet
+    bp = FindBP('/Game/BTestActor.BTestActor')
+    graph = GetFunctionGraph(bp, 'StructRet')
+    entry = NodeWrapper(graph.Nodes[0])
+    argsStr = MakeArgsStr(graph, (entry.i, Utils.StrInt))
+    recvNote = TestRecorderNote(graph, 'StructRet', 'recv', argsStr.ReturnValue, entry.then)
+    structs = []
+    for name, num in ('Red', 101), ('Blue', 102), ('Green', 103), ('Orange', 104):
+        structs.append(MakeTestStruct(graph, name, num).TestStruct)
+    array = MakeConnectedArray(graph, 'struct', TestStruct, structs)
+    argsStr = MakeArgsStr(graph, (array.Array, Utils.StrStructArray))
+    sendNote = TestRecorderNote(graph, 'StructRet', 'send', argsStr.ReturnValue, recvNote.then)
+    ret = GetReturnNode(graph)
+    ret.execute = sendNote.then
+    ret.ReturnValue = array.Array
+
+if 0:
+    # TestStructRet
+    bp = FindBP('/Game/BTester.BTester')
+    try:
+        GetFunctionGraph(bp, 'TestStructRet')
+        raise Exception('Delete function first!')
+    except AssertionError:
+        pass
+    graph = ue.blueprint_add_function(bp, 'TestStructRet')
+    entry = graph.Nodes[0]
+    i = MakeLiteral(graph, 10242048)
+    argsStr = MakeArgsStr(graph, (i.ReturnValue, Utils.StrInt))
+    preNote = TestRecorderNote(graph, 'tester', 'send', argsStr.ReturnValue, entry.node_find_pin('then'))
+    ta = GetVariable(graph, 'TestActor')
+    taCall = MakeCall(graph, TestActor.StructRet)
+    taCall.self = ta.TestActor
+    taCall.i = i.ReturnValue
+    taCall.execute = preNote.then
+    argsStr = MakeArgsStr(graph, (taCall.ReturnValue, Utils.StrStructArray))
+    TestRecorderNote(graph, 'tester', 'recv', argsStr.ReturnValue, taCall.then)
+
+if 0:
+    # StructOut
+    bp = FindBP('/Game/BTestActor.BTestActor')
+    graph = GetFunctionGraph(bp, 'StructOut')
+    entry = NodeWrapper(graph.Nodes[0])
+    argsStr = MakeArgsStr(graph, (entry.i, Utils.StrInt))
+    recvNote = TestRecorderNote(graph, 'StructOut', 'recv', argsStr.ReturnValue, entry.then)
+    structs = []
+    for name, num in ('Monday', 5), ('toozdee', 10), ('Wed', 15), ('Thirsty', 20):
+        structs.append(MakeTestStruct(graph, name, num).TestStruct)
+    array = MakeConnectedArray(graph, 'struct', TestStruct, structs)
+    of = MakeLiteral(graph, 9.895)
+    argsStr = MakeArgsStr(graph, (array.Array, Utils.StrStructArray), (of.ReturnValue, Utils.StrFloat))
+    sendNote = TestRecorderNote(graph, 'StructOut', 'send', argsStr.ReturnValue, recvNote.then)
+    ret = GetReturnNode(graph)
+    ret.execute = sendNote.then
+    ret.structs = array.Array
+    ret.of = of.ReturnValue
+
+if 0:
+    # TestStructOut
+    bp = FindBP('/Game/BTester.BTester')
+    try:
+        GetFunctionGraph(bp, 'TestStructOut')
+        raise Exception('Delete function first!')
+    except AssertionError:
+        pass
+    graph = ue.blueprint_add_function(bp, 'TestStructOut')
+    entry = graph.Nodes[0]
+    i = MakeLiteral(graph, 1234567)
+    argsStr = MakeArgsStr(graph, (i.ReturnValue, Utils.StrInt))
+    preNote = TestRecorderNote(graph, 'tester', 'send', argsStr.ReturnValue, entry.node_find_pin('then'))
+    ta = GetVariable(graph, 'TestActor')
+    taCall = MakeCall(graph, TestActor.StructOut)
+    taCall.self = ta.TestActor
+    taCall.i = i.ReturnValue
+    taCall.execute = preNote.then
+    argsStr = MakeArgsStr(graph, (taCall.structs, Utils.StrStructArray), (taCall.of, Utils.StrFloat))
+    TestRecorderNote(graph, 'tester', 'recv', argsStr.ReturnValue, taCall.then)
+
+if 0:
+    # StructIn
+    bp = FindBP('/Game/BTestActor.BTestActor')
+    graph = bp.UberGraphPages[0]
+    entry = GetEventNode(bp, 'StructIn')
+    argsStr = MakeArgsStr(graph, (entry.i, Utils.StrInt), (entry.structs, Utils.StrStructArray), (entry.f, Utils.StrFloat))
+    recvNote = TestRecorderNote(graph, 'StructIn', 'recv', argsStr.ReturnValue, entry.then)
+    sendNote = TestRecorderNote(graph, 'StructIn', 'send', 'None', recvNote.then)
+
+if 0:
+    # TestStructIn
+    bp = FindBP('/Game/BTester.BTester')
+    try:
+        GetFunctionGraph(bp, 'TestStructIn')
+        raise Exception('Delete function first!')
+    except AssertionError:
+        pass
+    graph = ue.blueprint_add_function(bp, 'TestStructIn')
+    entry = graph.Nodes[0]
+    i = MakeLiteral(graph, 1887)
+    structs = []
+    for name, num in ('Fingers', 10), ('Toes', 11), ('knees', 12), ('elboWS', 99):
+        structs.append(MakeTestStruct(graph, name, num).TestStruct)
+    array = MakeConnectedArray(graph, 'struct', TestStruct, structs)
+    f = MakeLiteral(graph, -271.122)
+    argsStr = MakeArgsStr(graph, (i.ReturnValue, Utils.StrInt), (array.Array, Utils.StrStructArray), (f.ReturnValue, Utils.StrFloat))
+    preNote = TestRecorderNote(graph, 'tester', 'send', argsStr.ReturnValue, entry.node_find_pin('then'))
+    ta = GetVariable(graph, 'TestActor')
+    taCall = MakeCall(graph, TestActor.StructIn)
+    taCall.self = ta.TestActor
+    taCall.i = i.ReturnValue
+    taCall.structs = array.Array
+    taCall.f = f.ReturnValue
+    taCall.execute = preNote.then
+    TestRecorderNote(graph, 'tester', 'recv', 'None', taCall.then)
+
+if 0:
     # ActorInOutRet
     bp = FindBP('/Game/BTestActor.BTestActor')
     graph = GetFunctionGraph(bp, 'ActorInOutRet')
